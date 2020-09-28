@@ -24,7 +24,8 @@ from label_studio.utils.validation import is_url
 from label_studio.utils.functions import get_full_hostname
 from label_studio.tasks import Tasks
 from label_studio.storage import create_storage, get_available_storage_names
-
+from  .models import Completion,Task
+from . import db
 logger = logging.getLogger(__name__)
 
 
@@ -53,11 +54,11 @@ class Project(object):
         self.derived_input_schema, self.derived_output_schema = None, None
 
         self.load_label_config()
-        self.update_derived_input_schema()
-        self.update_derived_output_schema()
+        # self.update_derived_input_schema()
+        # self.update_derived_output_schema()
 
         self.analytics = None
-        self.load_analytics()
+        # self.load_analytics()
 
         self.project_obj = None
         self.ml_backends = []
@@ -108,10 +109,10 @@ class Project(object):
     def create_storages(self):
         source = self.config['source']
         target = self.config['target']
-        self.source_storage = create_storage(source['type'], 'source', source['path'], self.path, self,
-                                             **source.get('params', {}))
-        self.target_storage = create_storage(target['type'], 'target', target['path'], self.path, self,
-                                             **target.get('params', {}))
+        self.source_storage = create_storage(source['type'], 'source', source['path'], self.path,self.config['load_source'], self,
+                                                 **source.get('params', {}))
+        self.target_storage = create_storage(target['type'], 'target', target['path'], self.path,self.config['load_source'], self,
+                                                 **target.get('params', {}))
 
     def update_storage(self, storage_for, storage_kwargs):
 
@@ -159,6 +160,17 @@ class Project(object):
         self.label_config_line = config_line_stripped(self.label_config_full)
         self.parsed_label_config = parse_config(self.label_config_line)
         self.input_data_tags = self.get_input_data_tags(self.label_config_line)
+
+    def parse_label_config(self, config):
+        self.label_config_full = config_comments_free(config)
+        self.label_config_line = config_line_stripped(self.label_config_full)
+        self.parsed_label_config = parse_config(self.label_config_line)
+        self.input_data_tags = self.get_input_data_tags(self.label_config_line)
+
+    def load_label_config_filename(self,filename):
+        label_config_full = config_comments_free(open(filename, encoding='utf8').read())
+        label_config_line = config_line_stripped(label_config_full)
+        return label_config_line
 
     def update_derived_input_schema(self):
         self.derived_input_schema = set()
@@ -402,7 +414,48 @@ class Project(object):
             for m in self.ml_backends:
                 m.clear(self)
 
-    def next_task(self, completed_tasks_ids):
+    def next_task(self, user):
+        # completed_tasks_ids = set(completed_tasks_ids)
+        sampling = self.config.get('sampling', 'sequential')
+
+        # Tasks are ordered ascending by their "id" fields. This is default mode.
+        # task_iter = filter(lambda i: i not in completed_tasks_ids, self.source_storage.ids())
+
+        if sampling == 'sequential':
+            # task_id = next(task_iter, None)
+            # if task_id is not None:
+            #     return self.source_storage.get(task_id)
+            return self.source_storage.nextTask(user)
+        # Tasks are sampled with equal probabilities
+        elif sampling == 'uniform':
+            actual_tasks_ids = list(task_iter)
+            if not actual_tasks_ids:
+                return None
+            random.shuffle(actual_tasks_ids)
+            return self.source_storage.get(actual_tasks_ids[0])
+
+        # Task with minimum / maximum average prediction score is taken
+        elif sampling.startswith('prediction-score'):
+            id_score_map = {}
+            for task_id, task in self.source_storage.items():
+                if task_id in completed_tasks_ids:
+                    continue
+                if 'predictions' in task and len(task['predictions']) > 0:
+                    score = sum((p['score'] for p in task['predictions']), 0) / len(task['predictions'])
+                    id_score_map[task_id] = score
+            if not id_score_map:
+                return None
+            if sampling.endswith('-min'):
+                best_idx = min(id_score_map, key=id_score_map.get)
+            elif sampling.endswith('-max'):
+                best_idx = max(id_score_map, key=id_score_map.get)
+            else:
+                raise NotImplementedError('Unknown sampling method ' + sampling)
+            return self.source_storage.get(best_idx)
+        else:
+            raise NotImplementedError('Unknown sampling method ' + sampling)
+
+    def next_task_old(self, completed_tasks_ids):
         completed_tasks_ids = set(completed_tasks_ids)
         sampling = self.config.get('sampling', 'sequential')
 
@@ -508,6 +561,43 @@ class Project(object):
             # tasks can hold the newest version of predictions, so task it from tasks
             data['predictions'] = self.source_storage.get(task_id).get('predictions', [])
         return data
+
+    def save_completion_in_DB(self, task_id, completion):
+        """ Save completion
+
+        :param task_id: task id
+        :param completion: json data from label (editor)
+        """
+        # try to get completions with task first
+        task = self.source_storage.get(task_id)
+
+        if task is not None:
+            # task = task.__dict__
+            # logger.debug(task)
+            if 'id' in completion:
+                dbCompletion = Completion.query.filter_by(id=completion['id']).first()
+                if dbCompletion is not None:
+                    dbCompletion.data = completion
+                    db.session.add(dbCompletion)
+                    db.session.commit()
+                    logger.debug(
+                        'Completion ' + str(task_id) + ' updated:\n' + json.dumps(dbCompletion.__dict__, indent=2))
+                    return dbCompletion.id
+            else:
+                completion['created_at'] = timestamp_now()
+                # _user_id = completion["user"]
+                # _taks_id = task.id
+                # _data = json(completion)
+                # logger.debug(type(completion))
+                dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=str(completion))
+                db.session.add(dbCompletion)
+                db.session.commit()
+                _dbCompletion = str(dbCompletion.__dict__)
+                logger.debug('Completion ' + str(task_id) + ' saved:\n' + json.dumps(_dbCompletion, indent=2))
+                return dbCompletion.id
+
+        else:
+            logger.debug("Task not found with task ID for completion" + str(task_id))
 
     def save_completion(self, task_id, completion):
         """ Save completion

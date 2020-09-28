@@ -809,7 +809,7 @@
           if (this.labelStudio) {
             this.labelStudio._sdk.loadTask(task.id, 'auto');
           } else {
-            this.labelStudio = LSF_SDK("label-studio", this.project.label_config_line, task);
+            this.labelStudio = LSF_SDK("label-studio", this.project.label_config_line, task, false, null);
           }
         },
         closeTaskPreview: function () {

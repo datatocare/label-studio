@@ -9,6 +9,8 @@ import logging
 import logging.config
 import traceback as tb
 import label_studio
+import flask_login
+from label_studio import db
 
 try:
     import ujson as json
@@ -28,7 +30,7 @@ from gevent.pywsgi import WSGIServer
 
 from flask import (
     request, jsonify, make_response, Response, Response as HttpResponse,
-    send_file, session, redirect
+    send_file, session, redirect,flash
 )
 from flask_api import status
 from types import SimpleNamespace
@@ -52,10 +54,10 @@ from label_studio.storage import get_storage_form
 
 from label_studio.project import Project
 from label_studio.tasks import Tasks
-from label_studio.utils.auth import requires_auth
-
+# from label_studio.utils.auth import requires_auth
+# from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 logger = logging.getLogger(__name__)
-
 
 def create_app():
     """Create application factory, as explained here:
@@ -67,13 +69,115 @@ def create_app():
     app = flask.Flask(__name__, static_url_path='')
     app.secret_key = 'A0Zrdqwf1AQWj12ajkhgFN]dddd/,?RfDWQQT'
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
     app.config['WTF_CSRF_ENABLED'] = False
     app.url_map.strict_slashes = False
     return app
 
 
 app = create_app()
+login_manager = flask_login.LoginManager()
+# users = {'Bilal': {'password': 'Bilal'}}
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+# db = SQLAlchemy(app)
+db.init_app(app)
+migrate = Migrate(app, db)
+@app.before_first_request
+def create_tables():
+    # from models import ContactModel
+    db.create_all()
+# with app.app_context():
+#     db.create_all()
+# db.create_all()
 
+from label_studio.models import User
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    """
+    User sign-up page.
+
+    GET requests serve sign-up page.
+    POST requests validate form & user creation.
+    """
+    if flask.request.method == 'GET':
+      return flask.render_template('SignupForm.html')
+    else:
+        name = request.form['name']
+        username = request.form['username']
+        password = request.form['password']
+
+        try:
+            existing_user = User.query.filter_by(username=username).first()
+            if existing_user is None:
+                user = User(
+                    name=name,
+                    username=username,
+                )
+                user.set_password(password)
+                db.session.add(user)
+                db.session.commit()  # Create new user
+                flask_login.login_user(user)  # Log in as newly created user
+                flash('Signup Done')
+                logger.debug("Sign up done")
+                return redirect(flask.url_for('labeling_page'))
+            else:
+                logger.debug("Sign up Error1")
+                flash('A user already exists with that username address.')
+                return flask.render_template('SignupForm.html')
+        except Exception as e:
+            flash('Error.')
+            logger.debug("Sign up Error 2")
+            logger.debug(e)
+            flash('Error: Try again')
+            return flask.render_template('SignupForm.html')
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Check if user is logged-in on every page load."""
+    if user_id is not None:
+        return User.query.get(user_id)
+    return None
+
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Redirect unauthorized users to Login page."""
+    flash('You must be logged in to view that page.')
+    logger.debug("UnAuthorized access")
+    return redirect(flask.url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """
+    Log-in page for registered users.
+
+    GET requests serve Log-in page.
+    POST requests validate and redirect user to dashboard.
+    """
+    # Bypass if user is logged in
+    if flask.request.method == 'GET':
+        if flask_login.current_user.is_authenticated:
+            return redirect(flask.url_for('labeling_page'))
+        else:
+            return flask.render_template('LoginForm.html')
+    else:
+    # if flask.request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password=password):
+            flask_login.login_user(user)
+            return redirect(flask.url_for('labeling_page'))
+        flash('Invalid username/password combination')
+    return redirect(flask.url_for('login'))
+
+
+@app.route('/logout')
+def logout():
+    flask_login.logout_user()
+    return redirect(flask.url_for('login'))
 
 # input arguments
 input_args = None
@@ -112,6 +216,12 @@ def project_get_or_create(multi_session_force_recreate=False):
         if multi_session_force_recreate:
             raise NotImplementedError(
                 '"multi_session_force_recreate" option supported only with "start-multi-session" mode')
+        if 'user' not in session:
+            session['user'] = str(uuid4())
+        # user = session['user']
+        user = flask_login.current_user.get_id()
+        if user is not None:
+            logger.debug("UserID" + user)
         return Project.get_or_create(input_args.project_name,
                                      input_args, context={'multi_session': False})
 
@@ -127,7 +237,7 @@ def app_init():
 
 
 @app.route('/static/media/<path:path>')
-@requires_auth
+@flask_login.login_required
 def send_media(path):
     """ Static for label tool js and css
     """
@@ -136,7 +246,7 @@ def send_media(path):
 
 
 @app.route('/upload/<path:path>')
-@requires_auth
+@flask_login.login_required
 def send_upload(path):
     """ User uploaded files
     """
@@ -148,7 +258,7 @@ def send_upload(path):
 
 
 @app.route('/static/<path:path>')
-@requires_auth
+# @flask_login.login_required
 def send_static(path):
     """ Static serving
     """
@@ -163,7 +273,7 @@ def validation_error_handler(error):
 
 
 @app.route('/')
-@requires_auth
+@flask_login.login_required
 @exception_treatment_page
 def labeling_page():
     """ Label studio frontend: task labeling
@@ -185,7 +295,8 @@ def labeling_page():
         if project.ml_backends_connected:
             task_data = project.make_predictions(task_data)
 
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
+    # logger.debug("Sending labeling html")
     return flask.render_template(
         'labeling.html',
         project=project,
@@ -193,29 +304,31 @@ def labeling_page():
         label_config_line=project.label_config_line,
         task_id=task_id,
         task_data=task_data,
+        user=flask_login.current_user,
         **find_editor_files()
     )
 
 
 @app.route('/welcome')
-@requires_auth
+@flask_login.login_required
 @exception_treatment_page
 def welcome_page():
     """ Label studio frontend: task labeling
     """
     project = project_get_or_create()
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     project.update_on_boarding_state()
     return flask.render_template(
         'welcome.html',
         config=project.config,
         project=project,
+        user=flask_login.current_user,
         on_boarding=project.on_boarding
     )
 
 
 @app.route('/tasks', methods=['GET', 'POST'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment_page
 def tasks_page():
     """ Tasks and completions page
@@ -223,18 +336,19 @@ def tasks_page():
     project = project_get_or_create()
     serialized_project = project.serialize()
     serialized_project['multi_session_mode'] = input_args.command != 'start-multi-session'
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return flask.render_template(
         'tasks.html',
         config=project.config,
         project=project,
         serialized_project=serialized_project,
+        user=flask_login.current_user,
         **find_editor_files()
     )
 
 
 @app.route('/setup')
-@requires_auth
+@flask_login.login_required
 @exception_treatment_page
 def setup_page():
     """ Setup label config
@@ -243,7 +357,7 @@ def setup_page():
 
     templates = get_config_templates()
     input_values = {}
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return flask.render_template(
         'setup.html',
         config=project.config,
@@ -251,49 +365,52 @@ def setup_page():
         label_config_full=project.label_config_full,
         templates=templates,
         input_values=input_values,
+        user=flask_login.current_user,
         multi_session=input_args.command == 'start-multi-session'
     )
 
 
 @app.route('/import')
-@requires_auth
+@flask_login.login_required
 @exception_treatment_page
 def import_page():
     """ Import tasks from JSON, CSV, ZIP and more
     """
     project = project_get_or_create()
 
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return flask.render_template(
         'import.html',
         config=project.config,
+        user=flask_login.current_user,
         project=project
     )
 
 
 @app.route('/export')
-@requires_auth
+@flask_login.login_required
 @exception_treatment_page
 def export_page():
     """ Export completions as JSON or using converters
     """
     project = project_get_or_create()
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return flask.render_template(
         'export.html',
         config=project.config,
+        user=flask_login.current_user,
         formats=project.converter.supported_formats,
         project=project
     )
 
 
 @app.route('/model')
-@requires_auth
+@flask_login.login_required
 @exception_treatment_page
 def model_page():
     """ Machine learning"""
     project = project_get_or_create()
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     ml_backends = []
     for ml_backend in project.ml_backends:
         if ml_backend.connected:
@@ -312,13 +429,13 @@ def model_page():
     return flask.render_template(
         'model.html',
         config=project.config,
-        project=project,
+        project=project,user=flask_login.current_user,
         ml_backends=ml_backends
     )
 
 
 @app.route('/api/render-label-studio', methods=['GET', 'POST'])
-@requires_auth
+@flask_login.login_required
 def api_render_label_studio():
     """ Label studio frontend rendering for iframe
     """
@@ -348,12 +465,12 @@ def api_render_label_studio():
     }
     response.update(find_editor_files())
 
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return flask.render_template('render_ls.html', **response)
 
 
 @app.route('/api/validate-config', methods=['POST'])
-@requires_auth
+@flask_login.login_required
 def api_validate_config():
     """ Validate label config via tags schema
     """
@@ -371,7 +488,7 @@ def api_validate_config():
 
 
 @app.route('/api/save-config', methods=['POST'])
-@requires_auth
+@flask_login.login_required
 def api_save_config():
     """ Save label config
     """
@@ -395,12 +512,12 @@ def api_save_config():
     except Exception as e:
         return make_response(jsonify({'label_config': [str(e)]}), status.HTTP_400_BAD_REQUEST)
 
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return Response(status=status.HTTP_201_CREATED)
 
 
 @app.route('/api/import-example', methods=['GET', 'POST'])
-@requires_auth
+@flask_login.login_required
 def api_import_example():
     """ Generate upload data example by config only
     """
@@ -422,7 +539,7 @@ def api_import_example():
 
 
 @app.route('/api/import-example-file')
-@requires_auth
+@flask_login.login_required
 def api_import_example_file():
     """ Task examples for import
     """
@@ -469,12 +586,12 @@ def api_import_example_file():
     response.headers['Content-Disposition'] = 'attachment; filename=%s' % filename
     response.headers['filename'] = filename
 
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return response
 
 
 @app.route('/api/import', methods=['POST'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_import():
     project = project_get_or_create()
@@ -505,8 +622,8 @@ def api_import():
     project.source_storage.set_many(new_tasks.keys(), new_tasks.values())
 
     # update schemas based on newly uploaded tasks
-    project.update_derived_input_schema()
-    project.update_derived_output_schema()
+    # project.update_derived_input_schema()
+    # project.update_derived_output_schema()
 
     duration = time.time() - start
     return make_response(jsonify({
@@ -519,7 +636,7 @@ def api_import():
 
 
 @app.route('/api/export', methods=['GET'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_export():
     export_format = request.args.get('format')
@@ -539,38 +656,51 @@ def api_export():
 
     response = send_file(zip_dir+'.zip', as_attachment=True)
     response.headers['filename'] = os.path.basename(zip_dir+'.zip')
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return response
 
 
 @app.route('/api/projects/1/next/', methods=['GET'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_generate_next_task():
     """ Generate next task to label
     """
     project = project_get_or_create()
     # try to find task is not presented in completions
-    completed_tasks_ids = project.get_completions_ids()
-    task = project.next_task(completed_tasks_ids)
+    # completed_tasks_ids = project.get_completions_ids()
+    # task = project.next_task(completed_tasks_ids)
+    task = project.next_task(flask_login.current_user.get_id())
     if task is None:
         # no tasks found
-        project.analytics.send(getframeinfo(currentframe()).function, error=404)
+        #project.analytics.send(getframeinfo(currentframe()).function, error=404)
         return make_response('', 404)
-
+    import random
+    # n = random.randint(0, 22)
+    # if n < 11:
+    #     task['label_config_line'] = project.label_config_line
+    # else :
+    #     task['label_config_line'] = project.load_label_config_filename("/Users/mbs10/NYU/label-studio/labeling_project/config2.xml")
+    # logger.debug('\nNext task:\n')
+    # logger.debug(task)
+    Newtask = {}
+    Newtask['data'] = task
+    Newtask['id'] = task['id']
+    task = Newtask
     task = resolve_task_data_uri(task)
-
-    #project.analytics.send(getframeinfo(currentframe()).function)
+    # task
+    ##project.analytics.send(getframeinfo(currentframe()).function)
 
     # collect prediction from multiple ml backends
     if project.ml_backends_connected:
         task = project.make_predictions(task)
-    logger.debug('Next task:\n' + json.dumps(task))
+    logger.debug('\nNext task Json:\n' + json.dumps(task))
+    # logger.debug("\n" + str(n) + "\n")
     return make_response(jsonify(task), 200)
 
 
 @app.route('/api/project/', methods=['POST', 'GET', 'PATCH'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_project():
     """ Project global operation"""
@@ -590,7 +720,7 @@ def api_project():
 
 
 @app.route('/api/project/storage-settings/', methods=['GET', 'POST'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_project_storage_settings():
     project = project_get_or_create()
@@ -615,7 +745,7 @@ def api_project_storage_settings():
                     for field in all_forms[storage_for][name]['fields']:
                         if field['name'] == 'data_key' and not field['data']:
                             field['data'] = list(project.data_types.keys())[0]
-        project.analytics.send(getframeinfo(currentframe()).function, method=request.method)
+        #project.analytics.send(getframeinfo(currentframe()).function, method=request.method)
         return make_response(jsonify(all_forms), 200)
 
     # POST: update storage given filled form
@@ -626,9 +756,9 @@ def api_project_storage_settings():
         selected_type = selected_type if selected_type else current_type
 
         form = get_storage_form(selected_type)(data=request.json)
-        project.analytics.send(
-            getframeinfo(currentframe()).function, method=request.method, storage=selected_type,
-            storage_for=storage_for)
+        #project.analytics.send(
+            # getframeinfo(currentframe()).function, method=request.method, storage=selected_type,
+            # storage_for=storage_for)
         if form.validate_on_submit():
             storage_kwargs = dict(form.data)
             storage_kwargs['type'] = request.json['type']  # storage type
@@ -646,19 +776,19 @@ def api_project_storage_settings():
 
 
 @app.route('/api/projects/1/task_ids/', methods=['GET'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_all_task_ids():
     """ Get all tasks ids
     """
     project = project_get_or_create()
     ids = list(sorted(project.source_storage.ids()))
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return make_response(jsonify(ids), 200)
 
 
 @app.route('/api/tasks/', methods=['GET'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_all_tasks():
     """ Get full tasks with pagination, completions and predictions
@@ -718,7 +848,7 @@ def api_all_tasks():
 
 
 @app.route('/api/tasks/<task_id>/', methods=['GET', 'DELETE'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_tasks(task_id):
     """ Get task by id
@@ -729,16 +859,16 @@ def api_tasks(task_id):
     if request.method == 'GET':
         task_data = project.get_task_with_completions(task_id) or project.source_storage.get(task_id)
         task_data = resolve_task_data_uri(task_data)
-        project.analytics.send(getframeinfo(currentframe()).function)
+        #project.analytics.send(getframeinfo(currentframe()).function)
         return make_response(jsonify(task_data), 200)
     elif request.method == 'DELETE':
         project.remove_task(task_id)
-        project.analytics.send(getframeinfo(currentframe()).function)
+        #project.analytics.send(getframeinfo(currentframe()).function)
         return make_response(jsonify('Task deleted.'), 204)
 
 
 @app.route('/api/tasks/delete', methods=['DELETE'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_tasks_delete():
     """ Delete all tasks & completions
@@ -749,19 +879,19 @@ def api_tasks_delete():
 
 
 @app.route('/api/projects/1/completions_ids/', methods=['GET'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_all_completion_ids():
     """ Get all completion ids
     """
     project = project_get_or_create()
     ids = project.get_completions_ids()
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return make_response(jsonify(ids), 200)
 
 
 @app.route('/api/tasks/<task_id>/completions/', methods=['POST', 'DELETE'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_completions(task_id):
     """ Delete or save new completion to output_dir with the same name as task_id
@@ -773,17 +903,21 @@ def api_completions(task_id):
         completion.pop('state', None)  # remove editor state
         completion.pop('skipped', None)
         completion.pop('was_cancelled', None)
-        completion_id = project.save_completion(int(task_id), completion)
-        project.analytics.send(getframeinfo(currentframe()).function)
+        completion["user"] =  flask_login.current_user.get_id()#session['user']
+        logger.debug(type(task_id))
+        logger.debug(completion)
+        completion_id = project.save_completion_in_DB(task_id, completion)
+        # completion_id = project.save_completion(int(task_id), completion)
+        #project.analytics.send(getframeinfo(currentframe()).function)
         return make_response(json.dumps({'id': completion_id}), 201)
 
     else:
-        project.analytics.send(getframeinfo(currentframe()).function, error=500)
+        #project.analytics.send(getframeinfo(currentframe()).function, error=500)
         return make_response('Incorrect request method', 500)
 
 
 @app.route('/api/tasks/<task_id>/cancel', methods=['POST'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_tasks_cancel(task_id):
     task_id = int(task_id)
@@ -791,14 +925,16 @@ def api_tasks_cancel(task_id):
     skipped_completion = request.json
     skipped_completion['was_cancelled'] = True  # for platform support
     skipped_completion['skipped'] = True
+    skipped_completion["user"] = flask_login.current_user.get_id()#session['user']
 
-    completion_id = project.save_completion(task_id, skipped_completion)
-    project.analytics.send(getframeinfo(currentframe()).function)
+    # completion_id = project.save_completion(task_id, skipped_completion)
+    completion_id = project.save_completion_in_DB(task_id, skipped_completion)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return make_response(json.dumps({'id': completion_id}), 201)
 
 
 @app.route('/api/tasks/<task_id>/completions/<completion_id>/', methods=['DELETE'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_completion_by_id(task_id, completion_id):
     """ Delete or save new completion to output_dir with the same name as task_id.
@@ -809,18 +945,18 @@ def api_completion_by_id(task_id, completion_id):
     if request.method == 'DELETE':
         if project.config.get('allow_delete_completions', False):
             project.delete_completion(int(task_id))
-            project.analytics.send(getframeinfo(currentframe()).function)
+            #project.analytics.send(getframeinfo(currentframe()).function)
             return make_response('deleted', 204)
         else:
-            project.analytics.send(getframeinfo(currentframe()).function, error=422)
+            #project.analytics.send(getframeinfo(currentframe()).function, error=422)
             return make_response('Completion removing is not allowed in server config', 422)
     else:
-        project.analytics.send(getframeinfo(currentframe()).function, error=500)
+        #project.analytics.send(getframeinfo(currentframe()).function, error=500)
         return make_response('Incorrect request method', 500)
 
 
 @app.route('/api/tasks/<task_id>/completions/<completion_id>/', methods=['PATCH'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_completion_update(task_id, completion_id):
     """ Rewrite existing completion with patch.
@@ -832,37 +968,39 @@ def api_completion_update(task_id, completion_id):
 
     completion.pop('state', None)  # remove editor state
     completion['skipped'] = completion['was_cancelled'] = False  # pop is a bad idea because of dict updating inside
+    completion["user"] = flask_login.current_user.get_id()#session['user']
 
     completion['id'] = int(completion_id)
-    project.save_completion(task_id, completion)
-    project.analytics.send(getframeinfo(currentframe()).function)
+    completion_id = project.save_completion_in_DB(task_id, completion)
+    # project.save_completion(task_id, completion)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return make_response('ok', 201)
 
 
 @app.route('/api/projects/1/expert_instruction')
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_instruction():
     """ Instruction for annotators
     """
     project = project_get_or_create()
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return make_response(project.config['instruction'], 200)
 
 
 @app.route('/api/remove-ml-backend', methods=['POST'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_remove_ml_backend():
     project = project_get_or_create()
     ml_backend_name = request.json['name']
     project.remove_ml_backend(ml_backend_name)
-    project.analytics.send(getframeinfo(currentframe()).function)
+    #project.analytics.send(getframeinfo(currentframe()).function)
     return make_response(jsonify('Deleted!'), 204)
 
 
 @app.route('/predict', methods=['POST'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_predict():
     """ Make ML prediction using ml_backends
@@ -874,15 +1012,15 @@ def api_predict():
     project = project_get_or_create()
     if project.ml_backends_connected:
         task_with_predictions = project.make_predictions(task)
-        project.analytics.send(getframeinfo(currentframe()).function)
+        #project.analytics.send(getframeinfo(currentframe()).function)
         return make_response(jsonify(task_with_predictions), 200)
     else:
-        project.analytics.send(getframeinfo(currentframe()).function, error=400)
+        #project.analytics.send(getframeinfo(currentframe()).function, error=400)
         return make_response(jsonify("No ML backend"), 400)
 
 
 @app.route('/api/train', methods=['POST'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_train():
     """Send train signal to ML backend"""
@@ -891,20 +1029,20 @@ def api_train():
         training_started = project.train()
         if training_started:
             logger.debug('Training started.')
-            project.analytics.send(getframeinfo(currentframe()).function, num_backends=len(project.ml_backends))
+            #project.analytics.send(getframeinfo(currentframe()).function, num_backends=len(project.ml_backends))
             return make_response(jsonify({'details': 'Training started'}), 200)
         else:
             logger.debug('Training failed.')
-            project.analytics.send(getframeinfo(currentframe()).function, error=400, training_started=training_started)
+            #project.analytics.send(getframeinfo(currentframe()).function, error=400, training_started=training_started)
             return make_response(
                 jsonify('Training is not started: seems that you don\'t have any ML backend connected'), 400)
     else:
-        project.analytics.send(getframeinfo(currentframe()).function, error=400)
+        #project.analytics.send(getframeinfo(currentframe()).function, error=400)
         return make_response(jsonify("No ML backend"), 400)
 
 
 @app.route('/api/predictions', methods=['POST'])
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def api_predictions():
     """Send creating predictions signal to ML backend"""
@@ -919,12 +1057,12 @@ def api_predictions():
 
         return make_response(jsonify({'details': 'Predictions done.'}), 200)
     else:
-        project.analytics.send(getframeinfo(currentframe()).function, error=400)
+        #project.analytics.send(getframeinfo(currentframe()).function, error=400)
         return make_response(jsonify("No ML backend"), 400)
 
 
 @app.route('/version')
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def version():
     """Show backend and frontend version"""
@@ -937,7 +1075,7 @@ def version():
 
 
 @app.route('/data/<path:filename>')
-@requires_auth
+@flask_login.login_required
 @exception_treatment
 def get_data_file(filename):
     """ External resource serving
@@ -974,7 +1112,7 @@ def start_browser(ls_url, no_browser):
     if no_browser:
         return
 
-    browser_url = ls_url + '/welcome'
+    browser_url = ls_url + "/login" #+ '/welcome'
     threading.Timer(2.5, lambda: webbrowser.open(browser_url)).start()
     print('Start browser at URL: ' + browser_url)
 
@@ -1065,3 +1203,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

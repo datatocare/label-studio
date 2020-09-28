@@ -47,8 +47,17 @@
     <img src="static/images/ls_logo.png" alt="label studio logo" class="img-logo">
     <span class="img-text">{{ config['title'] }}</span>
   </a>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class=flashes>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
   <ul id="nav">
-  &nbsp;
+  &nbsp;{% if user.name == "Bilal" %}
     <a href="." class="{% if url_for(request.endpoint) == '/' %}active{% endif %}">Labeling</a>
 
 
@@ -76,7 +85,9 @@
        data-tooltip="If you have found a bug or have questions ping us in Slack" data-position="bottom right"
        target="_blank"><img src="static/images/slack.png" height="22"/>
     </a>
-
+  {% endif %}
+    <li>{{ user.name }}</li>
+  <li><a href="logout">Logout</a></li>
   </ul>
 </div>
 

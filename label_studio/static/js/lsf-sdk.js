@@ -86,7 +86,7 @@ const Requests = (function(window) {
   };
 })(window);
 
-const _loadTask = function(ls, url, completionID) {
+const _loadTask = function(ls, url, reset,completionID) {
     try {
         const req = Requests.fetcher(url);
 
@@ -105,37 +105,39 @@ const _loadTask = function(ls, url, completionID) {
                 /**
                  * Convert received data to string for MST support
                  */
+                // ls = LSF_SDK("label-studio", response.label_config_line, null);
+                // ls.LS.config(response.label_config_line)
+                if (reset == true) {
+                    window.LSF_SDK = LSF_SDK("label-studio", response.data.layout, null, true, response);
+                } else {
+                    /**
+                     * Add new data from received task
+                     */
                 response.data = JSON.stringify(response.data);
+                    ls.setFlags({isLoading: false});
+                    ls.resetState();
+                    ls.assignTask(response);
+                    ls.initializeStore(_convertTask(response));
+                    let cs = ls.completionStore;
+                    let c;
+                    if (cs.predictions.length > 0) {
+                        c = ls.completionStore.addCompletionFromPrediction(cs.predictions[0]);
+                    }
 
-                /**
-                 * Add new data from received task
-                 */
-                ls.resetState();
-                ls.assignTask(response);
-                ls.initializeStore(_convertTask(response));
-                let cs = ls.completionStore;
-                let c;
-                if (cs.predictions.length > 0) {
-                    c = ls.completionStore.addCompletionFromPrediction(cs.predictions[0]);
+                    // we are on history item, take completion id from history
+                    else if (ls.completionStore.completions.length > 0 && completionID) {
+                        c = {id: completionID};
+                    } else if (ls.completionStore.completions.length > 0 && completionID === 'auto') {
+                        c = {id: ls.completionStore.completions[0].id};
+                    } else {
+                        c = ls.completionStore.addCompletion({userGenerate: true});
+                    }
+
+                    if (c.id) cs.selectCompletion(c.id);
+
+
+                    ls.onTaskLoad(ls, ls.task);
                 }
-
-                // we are on history item, take completion id from history
-                else if (ls.completionStore.completions.length > 0 && completionID) {
-                    c = {id: completionID};
-                }
-                else if (ls.completionStore.completions.length > 0 && completionID === 'auto') {
-                    c = {id: ls.completionStore.completions[0].id};
-                }
-
-                else {
-                    c = ls.completionStore.addCompletion({ userGenerate: true });
-                }
-
-                if (c.id) cs.selectCompletion(c.id);
-
-                ls.setFlags({ isLoading: false });
-
-                ls.onTaskLoad(ls, ls.task);
             })
         });
     } catch (err) {
@@ -143,14 +145,14 @@ const _loadTask = function(ls, url, completionID) {
     }
 };
 
-const loadNext = function(ls) {
+const loadNext = function(ls,rest) {
   var url = `${API_URL.MAIN}${API_URL.PROJECTS}/1${API_URL.NEXT}`;
-    return _loadTask(ls, url);
+    return _loadTask(ls, url,rest);
 };
 
 const loadTask = function(ls, taskID, completionID) {
   var url = `${API_URL.MAIN}${API_URL.TASKS}/${taskID}/`;
-    return _loadTask(ls, url, completionID);
+    return _loadTask(ls, url,false, completionID);
 };
 
 const _convertTask = function(task) {
@@ -179,7 +181,7 @@ const _convertTask = function(task) {
   return task;
 };
 
-const LSF_SDK = function(elid, config, task) {
+const LSF_SDK = function(elid, config, task, reset, response) {
 
   const showHistory = task === null;  // show history buttons only if label stream mode, not for task explorer
 
@@ -218,10 +220,10 @@ const LSF_SDK = function(elid, config, task) {
       "submit", // submit button on controls
       "update", // update button on controls
       "predictions",
-      "predictions:menu", // right menu with prediction items
+   //   "predictions:menu", // right menu with prediction items
       "completions:menu", // right menu with completion items
-      "completions:add-new",
-      "completions:delete",
+     // "completions:add-new",
+     // "completions:delete",
       "side-column", // entity
       "skip"
     ],
@@ -240,7 +242,7 @@ const LSF_SDK = function(elid, config, task) {
           if (task) {
             ls.setFlags({ isLoading: false });
           } else {
-            loadNext(ls);
+            loadNext(ls, true);
           }
         });
       });
@@ -312,7 +314,7 @@ const LSF_SDK = function(elid, config, task) {
             // refresh task from server
             loadTask(ls, ls.task.id, res.id);
           } else {
-            loadNext(ls);
+            loadNext(ls,true);
           }
         })
       });
@@ -332,16 +334,40 @@ const LSF_SDK = function(elid, config, task) {
       ls.onTaskLoad = this.onTaskLoad;  // FIXME: make it inside of LSF
       ls.onPrevButton = this.onPrevButton; // FIXME: remove it in future
       initHistory(ls);
-
-      if (!task) {
-        ls.setFlags({ isLoading: true });
-        loadNext(ls);
-      } else {
-          if (! task || ! task.completions || task.completions.length === 0) {
-              var c = ls.completionStore.addCompletion({ userGenerate: true });
-              ls.completionStore.selectCompletion(c.id);
+    if (reset == false) {
+          if (!task) {
+                ls.setFlags({isLoading: true});
+                loadNext(ls, false);
+          } else {
+            if (!task || !task.completions || task.completions.length === 0) {
+                var c = ls.completionStore.addCompletion({userGenerate: true});
+                ls.completionStore.selectCompletion(c.id);
+            }
           }
-      }
+       } else {
+            response.data = JSON.stringify(response.data);
+            ls.setFlags({isLoading: false});
+            ls.resetState();
+            ls.assignTask(response);
+            ls.initializeStore(_convertTask(response));
+            let cs = ls.completionStore;
+            let c;
+            if (cs.predictions.length > 0) {
+                c = ls.completionStore.addCompletionFromPrediction(cs.predictions[0]);
+            }
+
+            // we are on history item, take completion id from history
+            else if (ls.completionStore.completions.length > 0 && completionID) {
+                c = {id: completionID};
+            } else if (ls.completionStore.completions.length > 0 && completionID === 'auto') {
+                c = {id: ls.completionStore.completions[0].id};
+            } else {
+                c = ls.completionStore.addCompletion({userGenerate: true});
+            }
+
+            if (c.id) cs.selectCompletion(c.id);
+           // ls.onTaskLoad(ls, response);
+        }
     }
   });
 
@@ -361,7 +387,7 @@ const LSF_SDK = function(elid, config, task) {
             loadTask(LS, prev.task_id, prev.completion_id);
           }
           else {
-            loadNext(LS);  // new task
+            loadNext(LS, true);  // new task
           }
       }
   };

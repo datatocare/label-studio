@@ -30,10 +30,10 @@ def get_storage_form(storage_type):
     return _storage[storage_type].form
 
 
-def create_storage(storage_type, name, path, project_path=None, project=None, **kwargs):
+def create_storage(storage_type, name, path, project_path=None,_import=True, project=None, **kwargs):
     if storage_type not in _storage:
         raise NotImplementedError('Can\'t create storage "{}"'.format(storage_type))
-    return _storage[storage_type](name=name, path=path, project_path=project_path, project=project, **kwargs)
+    return _storage[storage_type](name=name, path=path, project_path=project_path, project=project,_import=_import, **kwargs)
 
 
 def get_available_storage_names():
@@ -59,13 +59,14 @@ class BaseStorage(ABC):
     form = BaseStorageForm
     description = 'Base Storage'
 
-    def __init__(self, name, path, project_path=None, project=None, **kwargs):
+    def __init__(self, name, path, project_path=None,_import=True, project=None, **kwargs):
         self.name = name
         self.path = path
         self.project_path = project_path
         self.project = project
         self.form_class = BaseStorageForm
         self.is_syncing = False
+        self.importFromFile = _import
 
     def get_params(self):
         return {

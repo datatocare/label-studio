@@ -1,0 +1,28 @@
+{"title": "Label Studio",
+    "protocol": "http://",
+    "host": "0.0.0.0",
+    "port": 8080,
+    "debug": true,
+    "label_config": "/Users/mbs10/NYU/label-studio/labeling_project/config.xml",
+    "input_path": "/Users/mbs10/NYU/label-studio/labeling_project/tasksdb.json",
+    "output_dir": "/Users/mbs10/NYU/label-studio/labeling_project/completions",
+    "instruction": "Type some <b>hypertext</b> for label experts!",
+    "allow_delete_completions": true,
+    "templates_dir": "examples",
+    "editor": {"debug": true},
+    "sampling": "sequential",
+    "ml_backends": [],
+    "source":
+        {"name": "Tasks",
+            "type": "jsonDB",
+            "path": "/Users/mbs10/NYU/label-studio/labeling_project/tasksdb.json"
+        },
+    "target":
+        {"name": "Completions",
+            "type": "completions-dir",
+            "path": "/Users/mbs10/NYU/label-studio/labeling_project/completions"
+        },
+    "config_path": "/Users/mbs10/NYU/label-studio/labeling_project/config.json",
+    "label_config_updated": true,
+    "load_source": true
+}
