@@ -228,7 +228,7 @@
               <!-- Control buttons -->
               <div class="ui row stackable" v-if="project.task_count > 0">
                 <div class="center aligned action-buttons">
-                  <!-- Sampling -->
+                  <!-- Sampling -- >
                   <span style="padding-top: 8px; padding-bottom: 11px;"
                         data-tooltip="Tasks sampling: selecting which task to take next in labeling. Edit project config file to change">
                   <span class="ui icon label">
@@ -236,6 +236,7 @@
                     {{ project.config['sampling'] }}
                   </span>
                 </span>
+                -->
                   <!-- Start labeling -->
                   <a class="ui button positive" href=".">Start Labeling</a>
                 </div>
@@ -480,7 +481,6 @@
   <script>
     Vue.use(SemanticUIVue);
     Vue.use(VueTippy);
-
     var app = new Vue({
       el: '#app',
 
@@ -549,7 +549,7 @@
       },
 
       methods: {
-        getApi: function (dst, url, always, fail, done) {
+         getApi: function (dst, url, always, fail, done) {
           /* this api call will do vue.data['dst'] = get(url) */
 
           var root = this;
@@ -804,13 +804,15 @@
           this.quick_view = true;
           this.current_task = task;
           this.columns = this.quick_columns;
-
+          var layout = task.layout
           // init
-          if (this.labelStudio) {
-            this.labelStudio._sdk.loadTask(task.id, 'auto');
-          } else {
-            this.labelStudio = LSF_SDK("label-studio", this.project.label_config_line, task, false, null);
-          }
+          if (window.LSF_SDK) {
+            //window.LSF_SDK._sdk.loadTask(task.id, 'auto');
+              window.LSF_SDK.resetState();
+              delete window.LSF_SDK;
+          } //else {
+            window.LSF_SDK = LSF_SDK("label-studio", layout, task, false, null);
+         //}
         },
         closeTaskPreview: function () {
           this.quick_view = false;
@@ -900,7 +902,8 @@
         Mousetrap.bind(['shift+down', 's'], this.nextTask);
 
         console.log('Vue mounting success');
-      }
+      },
+
     });
 
   </script>

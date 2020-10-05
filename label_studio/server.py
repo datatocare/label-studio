@@ -11,6 +11,7 @@ import traceback as tb
 import label_studio
 import flask_login
 from label_studio import db
+import click
 
 try:
     import ujson as json
@@ -46,7 +47,7 @@ from label_studio.utils.functions import (
 from label_studio.utils.misc import (
     exception_treatment, exception_treatment_page,
     config_line_stripped, get_config_templates, convert_string_to_hash, serialize_class,
-    DirectionSwitch, check_port_in_use
+    DirectionSwitch, check_port_in_use, timestamp_to_local_datetime
 )
 from label_studio.utils.argparser import parse_input_args
 from label_studio.utils.uri_resolver import resolve_task_data_uri
@@ -82,7 +83,8 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 # db = SQLAlchemy(app)
 db.init_app(app)
-migrate = Migrate(app, db)
+migrate = Migrate(app, db, render_as_batch=True)
+# migrate.init_app(app, db)
 @app.before_first_request
 def create_tables():
     # from models import ContactModel
@@ -91,7 +93,7 @@ def create_tables():
 #     db.create_all()
 # db.create_all()
 
-from label_studio.models import User
+from label_studio.models import User,Completion,Layout
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -686,6 +688,8 @@ def api_generate_next_task():
     Newtask = {}
     Newtask['data'] = task
     Newtask['id'] = task['id']
+    db_layout = Layout.query.filter_by(id=task['layout_id']).first()
+    Newtask['layout'] = db_layout.data #task['layout']
     task = Newtask
     task = resolve_task_data_uri(task)
     # task
@@ -694,7 +698,8 @@ def api_generate_next_task():
     # collect prediction from multiple ml backends
     if project.ml_backends_connected:
         task = project.make_predictions(task)
-    logger.debug('\nNext task Json:\n' + json.dumps(task))
+    logger.debug('\nNext task Json:\n')
+    logger.debug(json.dumps(task, indent=2))
     # logger.debug("\n" + str(n) + "\n")
     return make_response(jsonify(task), 200)
 
@@ -806,14 +811,43 @@ def api_all_tasks():
 
     # get task ids and sort them by completed time
     task_ids = project.source_storage.ids()
-    completed_at = project.get_completed_at()
-    skipped_status = project.get_skipped_status()
+    completed_at_data = db.session.query(Completion.task_id,Completion.data,Completion.completed_at).filter_by(user_id=flask_login.current_user.get_id()).all()#Completion.query(Completion.id,Completion.completed_at).filter_by(user_id=flask_login.current_user.get_id())
+    # logger.debug("task_ids")
+    # logger.debug(task_ids)
+    # logger.debug("completed_at_data")
+    # logger.debug(completed_at_data)
+
+    # completed_at = project.get_completed_at()
+    completed_at = {}#[({i:j}) for i,j in completed_at_data]
+    skipped_status = {}
+    # logger.debug(completed_at_data)
+    for id, data, time  in completed_at_data:
+        # id = data['id']
+        # try:
+        #     latest_time = max(data['completions'], key=itemgetter('created_at'))['created_at']
+        # except Exception as exc:
+        #     completed_at[id] = 'undefined'
+        # else:
+        if time is not None:
+            # completed_at[id] = 'undefined'
+        # else:
+            completed_at[id] = timestamp_to_local_datetime(time).strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            logger.debug("Time ins None")
+        data = json.loads(data)
+        # logger.debug(json.dumps(data, indent=2))
+        if "skipped" in data:
+            skipped_status[id] = data["skipped"]
+    # completed_at = completed_at.__dict__
+    # logger.debug("completed_at")
+    # logger.debug(completed_at)
+    # skipped_status = project.get_skipped_status()
 
     # ordering
     pre_order = ({
         'id': i,
         'completed_at': completed_at[i] if i in completed_at else None,
-        'has_skipped_completions': skipped_status[i] if i in completed_at else None,
+        'has_skipped_completions': skipped_status[i] if i in skipped_status else None,
     } for i in task_ids)
 
     if order == 'id':
@@ -834,16 +868,38 @@ def api_all_tasks():
     # get tasks with completions
     tasks = []
     for item in paginated:
+        # logger.debug(item)
+        # logger.debug("\n")
+        # logger.debug(type(item['id']))
         i = item['id']
-        task = project.get_task_with_completions(i)
-        if task is None:  # no completion at task
-            task = project.source_storage.get(i)
-        else:
+        task = project.source_storage.get(i) #project.get_task_with_completions(i)
+        completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(),task_id=i).first()
+        db_layout = Layout.query.filter_by(id=task.layout_id).first()
+        task = task.__dict__
+        task.pop('_sa_instance_state', None)
+        # if task is None:  # no completion at task
+        #     task = project.source_storage.get(i)
+        # else:
+        if completion is not None:
+            # completion = completion.__dict__
+            # completion.pop('_sa_instance_state', None)
+            completionData = json.loads(completion.data)
+            completionData['id'] = completion.id
+            # logger.debug(json.dumps(completionData, indent=2))
+            task["completions"] = [completionData]#[json.loads(completion.data)]
             task['completed_at'] = item['completed_at']
             task['has_skipped_completions'] = item['has_skipped_completions']
+        task['data'] = {}
+        # if i == 8 or i == 29:
+            # task['data']['website'] = task['text']
+        # else:
+        task['data']['text'] = task['text']
+        task.pop('text', None)
+        task["layout"] = db_layout.data
+        # logger.debug(json.dumps(task, indent=2))
         task = resolve_task_data_uri(task)
         tasks.append(task)
-
+    # logger.debug(tasks)
     return make_response(jsonify(tasks), 200)
 
 
@@ -857,8 +913,32 @@ def api_tasks(task_id):
     task_id = int(task_id)
     project = project_get_or_create()
     if request.method == 'GET':
-        task_data = project.get_task_with_completions(task_id) or project.source_storage.get(task_id)
-        task_data = resolve_task_data_uri(task_data)
+        # task_data = project.get_task_with_completions(task_id) or project.source_storage.get(task_id)
+        # task_data = resolve_task_data_uri(task_data)
+        task = project.source_storage.get(task_id) #project.get_task_with_completions(i)
+        completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(),task_id=task_id).first()
+        task = task.__dict__
+        task.pop('_sa_instance_state', None)
+        # if task is None:  # no completion at task
+        #     task = project.source_storage.get(i)
+        # else:
+        if completion is not None:
+            completionData = json.loads(completion.data)
+            completionData['id'] = completion.id
+            # logger.debug(json.dumps(json.loads(completion.data), indent=2))
+            task["completions"] = [completionData]#[json.loads(completion.data)]
+            # completionT = json.loads(completion.data)
+            # logger.debug(completion.__dict__)
+            # task["completions"] = [json.loads(completion.__dict__)]#json.dumps(completionT)
+            # task['completed_at'] = completion.completed_at
+            # if completion.data == "":
+            #     task['has_skipped_completions'] = "Yes"
+        task['data'] = {}
+        task['data']['text'] = task['text']
+        task.pop('text', None)
+        task_data = resolve_task_data_uri(task)
+        # tasks.append(task)
+        logger.debug(json.dumps(task, indent=2))
         #project.analytics.send(getframeinfo(currentframe()).function)
         return make_response(jsonify(task_data), 200)
     elif request.method == 'DELETE':
@@ -904,11 +984,12 @@ def api_completions(task_id):
         completion.pop('skipped', None)
         completion.pop('was_cancelled', None)
         completion["user"] =  flask_login.current_user.get_id()#session['user']
-        logger.debug(type(task_id))
-        logger.debug(completion)
+        logger.debug("Received completion" + json.dumps(completion, indent=2))
+        # logger.debug(completion)
         completion_id = project.save_completion_in_DB(task_id, completion)
         # completion_id = project.save_completion(int(task_id), completion)
         #project.analytics.send(getframeinfo(currentframe()).function)
+        logger.debug(completion_id)
         return make_response(json.dumps({'id': completion_id}), 201)
 
     else:
@@ -926,7 +1007,7 @@ def api_tasks_cancel(task_id):
     skipped_completion['was_cancelled'] = True  # for platform support
     skipped_completion['skipped'] = True
     skipped_completion["user"] = flask_login.current_user.get_id()#session['user']
-
+    logger.debug(json.dumps(skipped_completion, indent=2))
     # completion_id = project.save_completion(task_id, skipped_completion)
     completion_id = project.save_completion_in_DB(task_id, skipped_completion)
     #project.analytics.send(getframeinfo(currentframe()).function)
@@ -970,8 +1051,8 @@ def api_completion_update(task_id, completion_id):
     completion['skipped'] = completion['was_cancelled'] = False  # pop is a bad idea because of dict updating inside
     completion["user"] = flask_login.current_user.get_id()#session['user']
 
-    completion['id'] = int(completion_id)
-    completion_id = project.save_completion_in_DB(task_id, completion)
+    completion['id'] = completion_id
+    project.save_completion_in_DB(task_id, completion)
     # project.save_completion(task_id, completion)
     #project.analytics.send(getframeinfo(currentframe()).function)
     return make_response('ok', 201)
@@ -1200,7 +1281,79 @@ def main():
         else:
             app.run(host=host, port=port, debug=input_args.debug)
 
+    while True:
+        input = input("Enter number :")
+        if input == "exit":
+            return
+
+@app.cli.command("loadtasksold")
+@click.argument('input', type=click.File('rb'))
+def loadtasksold(input):
+    Alltasks = json.loads(input.read())
+    # logger.debug(Alltasks)
+    from .models import Task
+    if len(Alltasks) != 0:
+        for i, task in Alltasks.items():
+            try:
+                dbtask = Task(text=task["data"]["text"], layout=task["data"]["layout"],
+                              groundTruth=task["data"]["groundTruth"])
+                db.session.add(dbtask)
+                db.session.commit()
+            except Exception as e:
+                logger.debug("Storage db Error 3 ")
+                logger.debug(e)
+
+@app.cli.command("loadtasks")
+@click.argument('input', type=click.File('rb'))
+def loadtasks(input):
+    Alltasks = json.loads(input.read())
+    # logger.debug(Alltasks)
+    from .models import Task
+    if len(Alltasks) != 0:
+        for task in Alltasks:
+            try:
+                dbtask = Task(text=task["data"]["text"], layout_id=task["data"]["layout"],
+                              groundTruth=task["data"]["groundTruth"])
+                db.session.add(dbtask)
+                db.session.commit()
+            except Exception as e:
+                print("Storage db Error 3 ")
+                print(e)
+
+@app.cli.command("loadlayout")
+@click.argument('input', type=click.File('rb'))
+def loadlayout(input):
+    layouts = json.loads(input.read())
+    # print(layouts)
+    # logger.debug(layouts)
+    from .models import Task
+    if len(layouts) != 0:
+        for layout in layouts:
+            # text = "test"
+            print(layout)
+            print(type(layout))
+            # print(layouts[0])
+            try:
+                if "id" in layout and layout["id"] is not None:
+                    print("FOUND")
+                    db_layout = Layout.query.filter_by(id=layout["id"]).first()
+                    if db_layout is not None:
+                        db_layout.data = layout["text"]
+                        db.session.add(db_layout)
+                        db.session.commit()
+                    else:
+                        db_layout = Layout(data=layout["text"])
+                        db.session.add(db_layout)
+                        db.session.commit()
+
+                else:
+                    db_layout = Layout(data=layout["text"])
+                    db.session.add(db_layout)
+                    db.session.commit()
+            except Exception as e:
+                print(e)
+                logger.debug("Storage db Error - loadLaout 3 ")
+                logger.debug(e)
 
 if __name__ == "__main__":
     main()
-

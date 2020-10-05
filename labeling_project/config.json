@@ -24,5 +24,5 @@
         },
     "config_path": "/Users/mbs10/NYU/label-studio/labeling_project/config.json",
     "label_config_updated": true,
-    "load_source": true
+    "load_source": false
 }

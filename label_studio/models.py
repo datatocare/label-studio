@@ -23,11 +23,13 @@ class User(UserMixin, db.Model):
         unique=False
     )
 
-    # email = db.Column(
-    # 	db.String(40),
-    # 	unique=True,
-    # 	nullable=False
-    # )
+    type = db.Column(
+    	db.String(40),
+        default="normal",
+    	# unique=True,
+    	# nullable=False
+    )
+
     password = db.Column(
         db.String(200),
         primary_key=False,
@@ -71,13 +73,15 @@ class Task(db.Model):
         nullable=False,
         unique=False
     )
+    #
+    # layout = db.Column(
+    #     db.String(2000),
+    #     nullable=False,
+    #     unique=False
+    # )
 
-    layout = db.Column(
-        db.String(2000),
-        nullable=False,
-        unique=False
-    )
-
+    layout_id = db.Column(db.Integer, db.ForeignKey('layout.id'),
+                        nullable=False)
     groundTruth = db.Column(
         db.String(2000),
         nullable=False,
@@ -100,3 +104,28 @@ class Completion(db.Model):
         unique=False
     )
 
+    # hexID =db.Column(
+    #     db.String(2000),
+    #     default="",
+    #     nullable=False,
+    #     unique=False
+    # )
+    completed_at = db.Column(
+        db.BigInteger
+        # default="",
+        # nullable=False,
+        # unique=False
+    )
+
+class Layout(db.Model):
+    __tablename__ = 'layout'
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    data = db.Column(
+        db.String(2000),
+        nullable=False,
+        unique=False
+    )

@@ -573,28 +573,31 @@ class Project(object):
 
         if task is not None:
             # task = task.__dict__
-            # logger.debug(task)
-            if 'id' in completion:
-                dbCompletion = Completion.query.filter_by(id=completion['id']).first()
-                if dbCompletion is not None:
-                    dbCompletion.data = completion
+            # logger.debug(type(completion['id']))
+                if 'id' in completion and completion['id'] is not None:
+                    dbCompletion = Completion.query.filter_by(id=completion['id']).first()
+                    if dbCompletion is not None:
+                        # completion // update time lead time add current lead time
+                        dbCompletion.data = json.dumps(completion)
+                        dbCompletion.completed_at = timestamp_now()
+                        # dbCompletion.lea
+                        db.session.add(dbCompletion)
+                        db.session.commit()
+                        logger.debug(
+                            'Completion ' + str(task_id) + ' updated:\n' + json.dumps(dbCompletion.__dict__, indent=2))
+                        return dbCompletion.id
+                else:
+                    completion['created_at'] = timestamp_now()
+                    # _user_id = completion["user"]
+                    # _taks_id = task.id
+                    # _data = json(completion)
+                    # logger.debug(type(completion))
+                    dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=json.dumps(completion),completed_at=completion['created_at'])#,hexID=completion["result"][0]['id']
                     db.session.add(dbCompletion)
                     db.session.commit()
-                    logger.debug(
-                        'Completion ' + str(task_id) + ' updated:\n' + json.dumps(dbCompletion.__dict__, indent=2))
+                    # _dbCompletion = dbCompletion.__dict__
+                    logger.debug('Completion ' + str(task_id) + ' saved:\n' + json.dumps(str(dbCompletion), indent=2))
                     return dbCompletion.id
-            else:
-                completion['created_at'] = timestamp_now()
-                # _user_id = completion["user"]
-                # _taks_id = task.id
-                # _data = json(completion)
-                # logger.debug(type(completion))
-                dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=str(completion))
-                db.session.add(dbCompletion)
-                db.session.commit()
-                _dbCompletion = str(dbCompletion.__dict__)
-                logger.debug('Completion ' + str(task_id) + ' saved:\n' + json.dumps(_dbCompletion, indent=2))
-                return dbCompletion.id
 
         else:
             logger.debug("Task not found with task ID for completion" + str(task_id))

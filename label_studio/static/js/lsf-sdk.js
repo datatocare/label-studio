@@ -108,7 +108,11 @@ const _loadTask = function(ls, url, reset,completionID) {
                 // ls = LSF_SDK("label-studio", response.label_config_line, null);
                 // ls.LS.config(response.label_config_line)
                 if (reset == true) {
-                    window.LSF_SDK = LSF_SDK("label-studio", response.data.layout, null, true, response);
+                    response.completionID = completionID
+                    ls.resetState();
+                    delete window.LSF_SDK;
+                    window.LSF_SDK = LSF_SDK("label-studio", response.layout, null, true, response);
+                    // ls = window.LSF_SDK;
                 } else {
                     /**
                      * Add new data from received task
@@ -150,9 +154,9 @@ const loadNext = function(ls,rest) {
     return _loadTask(ls, url,rest);
 };
 
-const loadTask = function(ls, taskID, completionID) {
+const loadTask = function(ls, taskID, completionID,reset=false) {
   var url = `${API_URL.MAIN}${API_URL.TASKS}/${taskID}/`;
-    return _loadTask(ls, url,false, completionID);
+    return _loadTask(ls, url,reset, completionID);
 };
 
 const _convertTask = function(task) {
@@ -281,7 +285,7 @@ const LSF_SDK = function(elid, config, task, reset, response) {
       req.then(function(httpres) {
         ls.setFlags({ isLoading: false });
         // refresh task from server
-        loadTask(ls, ls.task.id, ls.completionStore.selected.id);
+        loadTask(ls, ls.task.id, ls.completionStore.selected.id, false);
       });
     },
 
@@ -297,7 +301,7 @@ const LSF_SDK = function(elid, config, task, reset, response) {
     onSkipTask: function(ls) {
       ls.setFlags({ loading: true });
       var c = ls.completionStore.selected;
-      var completion = _prepData(c, true);
+      var completion = _prepData(c, false);
 
       Requests.poster(
         `${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.CANCEL}`,
@@ -334,40 +338,43 @@ const LSF_SDK = function(elid, config, task, reset, response) {
       ls.onTaskLoad = this.onTaskLoad;  // FIXME: make it inside of LSF
       ls.onPrevButton = this.onPrevButton; // FIXME: remove it in future
       initHistory(ls);
-    if (reset == false) {
+      if (reset == false) {
           if (!task) {
-                ls.setFlags({isLoading: true});
-                loadNext(ls, false);
+              ls.setFlags({isLoading: true});
+              loadNext(ls, false);
+          // }
           } else {
             if (!task || !task.completions || task.completions.length === 0) {
                 var c = ls.completionStore.addCompletion({userGenerate: true});
                 ls.completionStore.selectCompletion(c.id);
+            } else {
+
             }
           }
-       } else {
-            response.data = JSON.stringify(response.data);
-            ls.setFlags({isLoading: false});
-            ls.resetState();
-            ls.assignTask(response);
-            ls.initializeStore(_convertTask(response));
-            let cs = ls.completionStore;
-            let c;
-            if (cs.predictions.length > 0) {
-                c = ls.completionStore.addCompletionFromPrediction(cs.predictions[0]);
-            }
-
-            // we are on history item, take completion id from history
-            else if (ls.completionStore.completions.length > 0 && completionID) {
-                c = {id: completionID};
-            } else if (ls.completionStore.completions.length > 0 && completionID === 'auto') {
-                c = {id: ls.completionStore.completions[0].id};
-            } else {
-                c = ls.completionStore.addCompletion({userGenerate: true});
-            }
-
-            if (c.id) cs.selectCompletion(c.id);
-           // ls.onTaskLoad(ls, response);
+      } else {
+        response.data = JSON.stringify(response.data);
+        ls.setFlags({isLoading: false});
+        ls.resetState();
+        ls.assignTask(response);
+        ls.initializeStore(_convertTask(response));
+        let cs = ls.completionStore;
+        let c;
+        if (cs.predictions.length > 0) {
+            c = ls.completionStore.addCompletionFromPrediction(cs.predictions[0]);
         }
+
+        // we are on history item, take completion id from history
+        else if (ls.completionStore.completions.length > 0 && response.completionID) {
+            c = {id: response.completionID};
+        } else if (ls.completionStore.completions.length > 0 && response.completionID === 'auto') {
+            c = {id: ls.completionStore.completions[0].id};
+        } else {
+            c = ls.completionStore.addCompletion({userGenerate: true});
+        }
+
+        if (c.id) cs.selectCompletion(c.id);
+           // ls.onTaskLoad(ls, response);
+      }
     }
   });
 

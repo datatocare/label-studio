@@ -19,7 +19,7 @@ class JsonDBStorage(BaseStorage):
         Alltasks = {}
         if os.path.exists(self.path):
             Alltasks = json_load(self.path, int_keys=True)
-        logger.debug(Alltasks)
+        # logger.debug(Alltasks)
         # logger.debug(type(Alltasks))
         if len(Alltasks) != 0:
             for i, task in Alltasks.items():
