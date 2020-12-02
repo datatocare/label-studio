@@ -76,6 +76,7 @@ class SimpleTextClassifier(LabelStudioMLBase):
             # expand predictions with their scores for all tasks
             predictions.append({'result': result, 'score': score})
 
+        print(predictions)
         return predictions
 
     def fit(self, completions, workdir=None, **kwargs):

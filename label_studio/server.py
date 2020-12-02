@@ -691,6 +691,10 @@ def api_generate_next_task():
     db_layout = Layout.query.filter_by(id=task['layout_id']).first()
     Newtask['layout'] = db_layout.data #task['layout']
     task = Newtask
+    ar = {}
+    ar["type"] = 3
+    ar["message"] = "Give your Answer"
+    task["taskAnswerResponse"] = ar
     task = resolve_task_data_uri(task)
     # task
     ##project.analytics.send(getframeinfo(currentframe()).function)
@@ -811,7 +815,8 @@ def api_all_tasks():
 
     # get task ids and sort them by completed time
     task_ids = project.source_storage.ids()
-    completed_at_data = db.session.query(Completion.task_id,Completion.data,Completion.completed_at).filter_by(user_id=flask_login.current_user.get_id()).all()#Completion.query(Completion.id,Completion.completed_at).filter_by(user_id=flask_login.current_user.get_id())
+    completed_at_data = db.session.query(Completion.task_id,Completion.data,Completion.completed_at).filter_by(user_id=flask_login.current_user.get_id()).all()
+    #Completion.query(Completion.id,Completion.completed_at).filter_by(user_id=flask_login.current_user.get_id())
     # logger.debug("task_ids")
     # logger.debug(task_ids)
     # logger.debug("completed_at_data")
@@ -896,6 +901,25 @@ def api_all_tasks():
         task['data']['text'] = task['text']
         task.pop('text', None)
         task["layout"] = db_layout.data
+        UserRanks = []
+        ur = {}
+        ur["rank"] = 1
+        ur["UserName"] = "Bilal Saleem"
+        UserRanks.append(ur)
+        ur = {}
+        ur["rank"] = 2
+        ur["UserName"] = "Djelle "
+        UserRanks.append(ur)
+        ur = {}
+        ur["rank"] = 3
+        ur["UserName"] = "Shan"
+        UserRanks.append(ur)
+        task["userranks"] = UserRanks
+        ar = {}
+        ar["type"] = 1
+        ar["message"] = "Your Answer is correct"
+        task["taskAnswerResponse"] = ar
+
         # logger.debug(json.dumps(task, indent=2))
         task = resolve_task_data_uri(task)
         tasks.append(task)
@@ -936,6 +960,21 @@ def api_tasks(task_id):
         task['data'] = {}
         task['data']['text'] = task['text']
         task.pop('text', None)
+        UserRanks = []
+        ur = {}
+        ur["rank"] = 1
+        ur["UserName"] = "Bilal Saleem"
+        UserRanks.append(ur)
+        ur = {}
+        ur["rank"] = 2
+        ur["UserName"] = "Djelle "
+        UserRanks.append(ur)
+        ur = {}
+        ur["rank"] = 3
+        ur["UserName"] = "Shan"
+        UserRanks.append(ur)
+        task["data"]["userranks"] = UserRanks
+
         task_data = resolve_task_data_uri(task)
         # tasks.append(task)
         logger.debug(json.dumps(task, indent=2))
@@ -1281,10 +1320,10 @@ def main():
         else:
             app.run(host=host, port=port, debug=input_args.debug)
 
-    while True:
-        input = input("Enter number :")
-        if input == "exit":
-            return
+    # while True:
+    #     input = input("Enter number :")
+    #     if input == "exit":
+    #         return
 
 @app.cli.command("loadtasksold")
 @click.argument('input', type=click.File('rb'))

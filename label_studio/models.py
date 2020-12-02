@@ -73,6 +73,9 @@ class Task(db.Model):
         nullable=False,
         unique=False
     )
+
+    #todo add batch id
+
     #
     # layout = db.Column(
     #     db.String(2000),

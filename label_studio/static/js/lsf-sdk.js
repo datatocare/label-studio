@@ -229,7 +229,10 @@ const LSF_SDK = function(elid, config, task, reset, response) {
      // "completions:add-new",
      // "completions:delete",
       "side-column", // entity
-      "skip"
+      "skip",
+       "leaderboad",
+       "messages",
+        "entity",
     ],
 
     onSubmitCompletion: function(ls, c) {
@@ -344,19 +347,21 @@ const LSF_SDK = function(elid, config, task, reset, response) {
               loadNext(ls, false);
           // }
           } else {
-            if (!task || !task.completions || task.completions.length === 0) {
+            if (!task.completions || task.completions.length === 0) {
                 var c = ls.completionStore.addCompletion({userGenerate: true});
                 ls.completionStore.selectCompletion(c.id);
-            } else {
-
             }
+            // else {
+            //     ls.addUserRanks(task.userranks);
+            // }
           }
       } else {
         response.data = JSON.stringify(response.data);
         ls.setFlags({isLoading: false});
         ls.resetState();
         ls.assignTask(response);
-        ls.initializeStore(_convertTask(response));
+        cTask = _convertTask(response);
+        ls.initializeStore(cTask);
         let cs = ls.completionStore;
         let c;
         if (cs.predictions.length > 0) {
