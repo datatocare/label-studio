@@ -4,7 +4,7 @@ type: guide
 order: 105
 ---
 
-Your annotations are stored in [raw completion format](#Completion-format) inside `my_project_name/completions` directory, one file per labeled task named as `task_id.json`.
+Your annotations are stored in [raw completion format](#Export-formats) inside `my_project_name/completions` directory, one file per labeled task named as `task_id.json`.
 
 You can optionally convert and export raw completions to a more common format by doing one of the following:
 
@@ -18,6 +18,12 @@ The output data is stored in _completions_ - JSON formatted files, one per each 
 
 ```json
 {
+    "id": 1,
+
+    "data": {
+        "image": "https://htx-misc.s3.amazonaws.com/opensource/label-studio/examples/images/nick-owuor-astro-nic-visuals-wDifg5xc9Z4-unsplash.jpg"
+    },
+    
     "completions": [
         {
             "id": "1001",
@@ -43,10 +49,7 @@ The output data is stored in _completions_ - JSON formatted files, one per each 
             ]
         }
     ],
-    "data": {
-        "image": "https://htx-misc.s3.amazonaws.com/opensource/label-studio/examples/images/nick-owuor-astro-nic-visuals-wDifg5xc9Z4-unsplash.jpg"
-    },
-    "id": 1,
+
     "predictions": [
         {
             "created_ago": "3 hours",
@@ -204,10 +207,4 @@ Export your brushe labels to numpy 2d arrays and PNG images. One label is equal 
 
 ## Export using API
 
-You can use an API to request a file with exported results, e.g.
-
-```bash
-curl http://localhost:8080/api/export?format=JSON > exported_results.tar.gz
-```
-
-The `format` parameter could be one of available [export formats](#Export-formats)
+You can export results using server API. Check [API page](api.html) for more details.

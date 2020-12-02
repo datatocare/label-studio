@@ -9,9 +9,11 @@ import calendar
 import pytz
 import flask
 import socket
-import errno
+import requests
+import label_studio
 
-from json import JSONEncoder
+from pkg_resources import parse_version
+
 from collections import defaultdict, OrderedDict
 from lxml import etree, objectify
 from datetime import datetime
@@ -56,7 +58,7 @@ class AnswerException(Exception):
 
 
 # standard exception treatment for any api function
-def exception_treatment(f):
+def exception_handler(f):
     def exception_f(*args, **kwargs):
         try:
             return f(*args, **kwargs)
@@ -83,7 +85,7 @@ def exception_treatment(f):
 
 
 # standard exception treatment for any page function
-def exception_treatment_page(f):
+def exception_handler_page(f):
     def exception_f(*args, **kwargs):
         try:
             return f(*args, **kwargs)
@@ -91,6 +93,7 @@ def exception_treatment_page(f):
             error = str(e)
             traceback = tb.format_exc()
             logger.debug(traceback)
+            print(traceback)
             return flask.render_template(
                 'includes/error.html',
                 error=error, header="Project loading error", traceback=traceback)
@@ -131,16 +134,33 @@ def get_app_version():
     return pkg_resources.get_distribution('label-studio').version
 
 
-def parse_config(config_string):
+_LABEL_TAGS = {'Label', 'Choice'}
+_NOT_CONTROL_TAGS = {'Filter',}
 
-    LABEL_TAGS = {'Label', 'Choice'}
-    NOT_CONTROL_TAGS = {'Filter',}
+
+def parse_config(config_string):
+    """
+    :param config_string: Label config string
+    :return: structured config of the form:
+    {
+        "<ControlTag>.name": {
+            "type": "ControlTag",
+            "to_name": ["<ObjectTag1>.name", "<ObjectTag2>.name"],
+            "inputs: [
+                {"type": "ObjectTag1", "value": "<ObjectTag1>.value"},
+                {"type": "ObjectTag2", "value": "<ObjectTag2>.value"}
+            ],
+            "labels": ["Label1", "Label2", "Label3"] // taken from "alias" if exists or "value"
+    }
+    """
+    if not config_string:
+        return {}
 
     def _is_input_tag(tag):
         return tag.attrib.get('name') and tag.attrib.get('value')
 
     def _is_output_tag(tag):
-        return tag.attrib.get('name') and tag.attrib.get('toName') and tag.tag not in NOT_CONTROL_TAGS
+        return tag.attrib.get('name') and tag.attrib.get('toName') and tag.tag not in _NOT_CONTROL_TAGS
 
     def _get_parent_output_tag_name(tag, outputs):
         # Find parental <Choices> tag for nested tags like <Choices><View><View><Choice>...
@@ -155,13 +175,13 @@ def parse_config(config_string):
 
     xml_tree = etree.fromstring(config_string)
 
-    inputs, outputs, labels = {}, {}, defaultdict(set)
+    inputs, outputs, labels = {}, {}, defaultdict(dict)
     for tag in xml_tree.iter():
         if _is_output_tag(tag):
             outputs[tag.attrib['name']] = {'type': tag.tag, 'to_name': tag.attrib['toName'].split(',')}
         elif _is_input_tag(tag):
             inputs[tag.attrib['name']] = {'type': tag.tag, 'value': tag.attrib['value'].lstrip('$')}
-        if tag.tag not in LABEL_TAGS:
+        if tag.tag not in _LABEL_TAGS:
             continue
         parent_name = _get_parent_output_tag_name(tag, outputs)
         if parent_name is not None:
@@ -171,7 +191,7 @@ def parse_config(config_string):
                     'Inspecting tag {tag_name}... found no "value" or "alias" attributes.'.format(
                         tag_name=etree.tostring(tag, encoding='unicode').strip()[:50]))
             else:
-                labels[parent_name].add(actual_value)
+                labels[parent_name][actual_value] = dict(tag.attrib)
     for output_tag, tag_info in outputs.items():
         tag_info['inputs'] = []
         for input_tag_name in tag_info['to_name']:
@@ -181,12 +201,21 @@ def parse_config(config_string):
                                .format(input_tag_name=input_tag_name, output_tag=output_tag))
             tag_info['inputs'].append(inputs[input_tag_name])
         tag_info['labels'] = list(labels[output_tag])
+        tag_info['labels_attrs'] = labels[output_tag]
     logger.debug('Parsed config:\n' + json.dumps(outputs, indent=2))
     return outputs
 
 
-def iter_config_templates():
-    templates_dir = find_dir('examples')
+def parse_label_attrs(config_string):
+    xml_tree = etree.fromstring(config_string)
+
+
+def iter_config_templates(templates_dir=None):
+    try:
+        templates_dir = find_dir('examples') if templates_dir is None else find_dir(templates_dir)
+    except IOError:
+        pass  # use templates_dir as is
+
     for d in os.listdir(templates_dir):
         # check xml config file exists
         path = os.path.join(templates_dir, d, 'config.xml')
@@ -195,13 +224,14 @@ def iter_config_templates():
         yield path
 
 
-def get_config_templates():
+def get_config_templates(config):
     """ Get label config templates from directory (as usual 'examples' directory)
     """
     from collections import defaultdict, OrderedDict
     templates = defaultdict(lambda: defaultdict(list))
 
-    for i, path in enumerate(iter_config_templates()):
+    template_dir = config.get('templates_dir', 'examples')
+    for i, path in enumerate(iter_config_templates(template_dir)):
         # open and check xml
         code = open(path).read()
         try:
@@ -227,8 +257,8 @@ def get_config_templates():
 
     # sort by title
     ordering = {
-        'basic': ['audio', 'image', 'text', 'html', 'other'],
-        'advanced': ['layouts', 'nested', 'per-region', 'other']
+        'basic': ['audio', 'image', 'text', 'html', 'time-series'],
+        'advanced': ['layouts', 'nested', 'per-region', 'other', 'time-series']
     }
     ordered_templates = OrderedDict()
     for complexity in ['basic', 'advanced']:
@@ -330,7 +360,44 @@ def compare_with_none(field, inverted):
 
 
 def check_port_in_use(host, port):
-    logger.info('Checking if host & port is available', host + ':' + str(port))
+    logger.info('Checking if host & port is available :: ' + str(host) + ':' + str(port))
     host = host.replace('https://', '').replace('http://', '')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex((host, port)) == 0
+
+
+def start_browser(ls_url, no_browser):
+    import threading
+    import webbrowser
+    if no_browser:
+        return
+
+    browser_url = ls_url + '/welcome'
+    threading.Timer(2.5, lambda: webbrowser.open(browser_url)).start()
+    print('Start browser at URL: ' + browser_url)
+
+
+def get_latest_version():
+    pypi_url = 'https://pypi.org/pypi/%s/json' % label_studio.package_name
+    try:
+        response = requests.get(pypi_url).text
+        latest_version = json.loads(response)['info']['version']
+    except Exception as exc:
+        logger.error("Can't get latest version.", exc_info=True)
+    else:
+        return latest_version
+
+
+def current_version_is_outdated(latest_version):
+    latest_version = parse_version(latest_version)
+    current_version = parse_version(label_studio.__version__)
+    return current_version < latest_version
+
+
+def str2datetime(timestamp_str):
+    try:
+        ts = int(timestamp_str)
+    except:
+        return timestamp_str
+    # return datetime.utcfromtimestamp(ts).strftime('%Y%m%d.%H%M%S')
+    return datetime.utcfromtimestamp(ts).strftime('%c')
