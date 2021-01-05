@@ -1,6 +1,6 @@
 # Label Studio &middot; ![GitHub](https://img.shields.io/github/license/heartexlabs/label-studio?logo=heartex) ![label-studio:build](https://github.com/heartexlabs/label-studio/workflows/label-studio:build/badge.svg) ![code-coverage](https://github.com/heartexlabs/label-studio/blob/master/.github/test-coverage.svg) ![GitHub release](https://img.shields.io/github/v/release/heartexlabs/label-studio?include_prereleases) &middot;
 
-[Website](https://labelstud.io/) • [Docs](https://labelstud.io/guide/) • [Twitter](https://twitter.com/heartexlabs) • [Join Slack Community <img src="https://go.heartex.net/docs/images/slack-mini.png" width="18px"/>](https://join.slack.com/t/label-studio/shared_invite/zt-cr8b7ygm-6L45z7biEBw4HXa5A2b5pw)
+[Website](https://labelstud.io/) • [Docs](https://labelstud.io/guide/) • [Twitter](https://twitter.com/heartexlabs) • [Join Slack Community <img src="https://app.heartex.ai/docs/images/slack-mini.png" width="18px"/>](https://join.slack.com/t/label-studio/shared_invite/zt-cr8b7ygm-6L45z7biEBw4HXa5A2b5pw)
 
 <br/>
 
@@ -105,19 +105,21 @@ If you want to build a local image, run:
 docker build -t heartexlabs/label-studio:latest .
 ```
 
-## Using docker-compose
+## Run docker-compose
 
 You can also start serving at `http://localhost:8080` using docker-compose.
 
-### First time to run the app
+**First time to run the app**
 ```bash
 INIT_COMMAND='--init' docker-compose up -d
 ```
-### Run the app with existing project data
+
+**Run the app with existing project data**
 ```bash
 docker-compose up -d
 ```
-### Run the app reseting project data
+
+**Run the app reseting project data**
 ```bash
 INIT_COMMAND='--init --force' docker-compose up -d
 ```
@@ -129,8 +131,10 @@ INIT_COMMAND=--init --force
 
 ## One Click Deploy
 
+You can deploy LS right now in one click on any of these clouds: 
+
 [<img src="https://www.herokucdn.com/deploy/button.svg" height="30px">](https://heroku.com/deploy)
-[<img src="https://azurecomcdn.azureedge.net/mediahandler/acomblog/media/Default/blog/deploybutton.png" height="30px">](https://azuredeploy.net/)
+[<img src="https://aka.ms/deploytoazurebutton" height="30px">](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fheartexlabs%2Flabel-studio%2Fmaster%2Fazuredeploy.json)
 [<img src="https://deploy.cloud.run/button.svg" height="30px">](https://deploy.cloud.run)
 
 ## Features :star2:
@@ -171,6 +175,9 @@ The list of supported use cases for data annotation. Please contribute your own 
 | **Comparison** | |
 | Pairwise | Comparing entities in pairs to judge which of each entity is preferred | 
 | Ranking | Sort items in the list according to some property |
+| **Time Series** | |
+| Classification |  |
+| Segmentation |  |
 
 ## Machine Learning Integration
 
@@ -184,6 +191,11 @@ That gives you the opportunities to use:
 - **Online Learning**: Simultaneously update (retrain) your model while new annotations are coming
 - **Active Learning**: Perform labeling in active learning mode - select only most complex examples
 - **Prediction Service**: Instantly create running production-ready prediction service
+
+## Label Studio Integration to your services
+
+* You can use [Label Studio Frontend](https://github.com/heartexlabs/label-studio-frontend) as a separated React library, [read more here](https://labelstud.io/guide/frontend.html). 
+* Label Studio Backend (this repo) can be integrated to your app via Flask Blueprints. [See example of integration here](https://github.com/heartexlabs/label-studio/blob/master/blueprint_usage_example.py).
 
 ## Label Studio for Teams, Startups, and Enterprises :office:
 

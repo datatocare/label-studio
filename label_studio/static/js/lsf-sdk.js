@@ -6,12 +6,12 @@
 
 const API_URL = {
   MAIN: "api",
+  PROJECT: "/project",
   TASKS: "/tasks",
   COMPLETIONS: "/completions",
-  CANCEL: "/cancel",
-  PROJECTS: "/projects",
-  NEXT: "/next/",
-  EXPERT_INSTRUCTIONS: "/expert_instruction"
+  CANCEL: "?was_cancelled=1",
+  NEXT: "/next",
+  INSTRUCTION: "/project?fields=instruction"
 };
 
 const Requests = (function(window) {
@@ -111,37 +111,46 @@ const _loadTask = function(ls, url, reset,completionID) {
                     response.completionID = completionID
                     ls.resetState();
                     delete window.LSF_SDK;
-                    window.LSF_SDK = LSF_SDK("label-studio", response.layout, null, true, response);
+                    window.LSF_SDK = LSF_SDK("label-studio", response.layout, null, false, null, true, response);
                     // ls = window.LSF_SDK;
-                } else {
+                }
+                else {
                     /**
                      * Add new data from received task
                      */
                 response.data = JSON.stringify(response.data);
-                    ls.setFlags({isLoading: false});
-                    ls.resetState();
-                    ls.assignTask(response);
-                    ls.initializeStore(_convertTask(response));
-                    let cs = ls.completionStore;
-                    let c;
-                    if (cs.predictions.length > 0) {
-                        c = ls.completionStore.addCompletionFromPrediction(cs.predictions[0]);
-                    }
+                ls.resetState();
+                ls.assignTask(response);
+                ls.initializeStore(_convertTask(response));
+                let cs = ls.completionStore;
+                let c;
 
-                    // we are on history item, take completion id from history
-                    else if (ls.completionStore.completions.length > 0 && completionID) {
-                        c = {id: completionID};
-                    } else if (ls.completionStore.completions.length > 0 && completionID === 'auto') {
-                        c = {id: ls.completionStore.completions[0].id};
-                    } else {
-                        c = ls.completionStore.addCompletion({userGenerate: true});
-                    }
-
-                    if (c.id) cs.selectCompletion(c.id);
-
-
-                    ls.onTaskLoad(ls, ls.task);
+                if (ls.completionStore.completions.length > 0 && completionID === 'auto') {
+                  c = {id: ls.completionStore.completions[0].id};
                 }
+
+                else if (cs.predictions.length > 0) {
+                    c = ls.completionStore.addCompletionFromPrediction(cs.predictions[0]);
+                }
+
+                // we are on history item, take completion id from history
+                else if (ls.completionStore.completions.length > 0 && completionID) {
+                    c = {id: completionID};
+                }
+
+                else {
+                    c = ls.completionStore.addCompletion({ userGenerate: true });
+                }
+
+                if (c.id) cs.selectCompletion(c.id);
+
+                // fix for broken old references in mst
+                cs.selected.setupHotKeys();
+
+                ls.setFlags({ isLoading: false });
+
+                ls.onTaskLoad(ls, ls.task);
+              }
             })
         });
     } catch (err) {
@@ -149,14 +158,14 @@ const _loadTask = function(ls, url, reset,completionID) {
     }
 };
 
-const loadNext = function(ls,rest) {
-  var url = `${API_URL.MAIN}${API_URL.PROJECTS}/1${API_URL.NEXT}`;
-    return _loadTask(ls, url,rest);
+const loadNext = function(ls, rest) {
+  var url = `${API_URL.MAIN}${API_URL.PROJECT}${API_URL.NEXT}`;
+  return _loadTask(ls, url,rest);
 };
 
 const loadTask = function(ls, taskID, completionID,reset=false) {
   var url = `${API_URL.MAIN}${API_URL.TASKS}/${taskID}/`;
-    return _loadTask(ls, url,reset, completionID);
+  return _loadTask(ls, url,reset, completionID);
 };
 
 const _convertTask = function(task) {
@@ -185,7 +194,8 @@ const _convertTask = function(task) {
   return task;
 };
 
-const LSF_SDK = function(elid, config, task, reset, response) {
+
+const LSF_SDK = function(elid, config, task, hide_skip, description, reset, response) {
 
   const showHistory = task === null;  // show history buttons only if label stream mode, not for task explorer
 
@@ -212,12 +222,7 @@ const LSF_SDK = function(elid, config, task, reset, response) {
       ls.taskHistoryCurrent = ls.taskHistoryIds.length;
   }
 
-  var LS = new LabelStudio(elid, {
-    config: config,
-    user: { pk: 1, firstName: "Awesome", lastName: "User" },
-
-    task: _convertTask(task),
-    interfaces: [
+  var interfaces = [
       "basic",
       "panel", // undo, redo, reset panel
       "controls", // all control buttons: skip, submit, update
@@ -225,15 +230,25 @@ const LSF_SDK = function(elid, config, task, reset, response) {
       "update", // update button on controls
       "predictions",
    //   "predictions:menu", // right menu with prediction items
-      "completions:menu", // right menu with completion items
+    //  "completions:menu", // right menu with completion items
      // "completions:add-new",
      // "completions:delete",
       "side-column", // entity
       "skip",
        "leaderboad",
        "messages",
-        "entity",
-    ],
+  ];
+  if (!hide_skip) {
+    interfaces.push('skip');
+  }
+
+  var LS = new LabelStudio(elid, {
+    config: config,
+    user: { pk: 1, firstName: "Awesome", lastName: "User" },
+
+    task: _convertTask(task),
+    interfaces: interfaces,
+    description: description,
 
     onSubmitCompletion: function(ls, c) {
       ls.setFlags({ isLoading: true });
@@ -244,6 +259,13 @@ const LSF_SDK = function(elid, config, task, reset, response) {
           if (res && res.id) {
               c.updatePersonalKey(res.id.toString());
               addHistory(ls, ls.task.id, res.id);
+              $('body').toast({
+            class: 'success',
+            title: 'Answer Response',
+            message: '<pre>' + "Your Answer is correct" + '</pre>',
+            displayTime: 3000,
+            position: 'bottom center'
+          });
           }
 
           if (task) {
@@ -307,7 +329,7 @@ const LSF_SDK = function(elid, config, task, reset, response) {
       var completion = _prepData(c, false);
 
       Requests.poster(
-        `${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.CANCEL}`,
+        `${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}${API_URL.CANCEL}`,
         completion
       ).then(function(response) {
         response.json().then(function (res) {
@@ -316,13 +338,13 @@ const LSF_SDK = function(elid, config, task, reset, response) {
             addHistory(ls, ls.task.id, res.id);
           }
 
-          if (task) {
-            ls.setFlags({ isLoading: false });
+          // if (task) {
+          //   ls.setFlags({ isLoading: false });
             // refresh task from server
-            loadTask(ls, ls.task.id, res.id);
-          } else {
+            // loadTask(ls, ls.task.id, res.id);
+          // } else {
             loadNext(ls,true);
-          }
+          // }
         })
       });
 
@@ -355,7 +377,7 @@ const LSF_SDK = function(elid, config, task, reset, response) {
             //     ls.addUserRanks(task.userranks);
             // }
           }
-      } else {
+      }   else {
         response.data = JSON.stringify(response.data);
         ls.setFlags({isLoading: false});
         ls.resetState();

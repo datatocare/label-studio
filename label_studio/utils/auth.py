@@ -2,7 +2,7 @@ from functools import wraps
 from flask import request, Response
 
 USERNAME = 'ls'
-PASSWORD = ''
+PASSWORD = 'bilal'
 
 
 def check_auth(username, password):

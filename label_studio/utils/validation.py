@@ -21,8 +21,10 @@ _DATA_TYPES = {
     'Header': [str, int, float],
     'HyperText': [str],
     'Image': [str],
-    'List': [list],
-    'Dialog': [list]
+    'Paragraphs': [list],
+    'Table': [dict],
+    'TimeSeries': [dict, list, str],
+    'TimeSeriesChannel': [dict, list, str]
 }
 logger = logging.getLogger(__name__)
 settings = Settings()
@@ -83,9 +85,9 @@ class TaskValidator:
             TaskValidator.check_data(project, data)
         except ValidationError as e:
             if dict_is_root:
-                raise ValidationError(e.detail[0] + ' [assume: item = {...}, item is task root] ')
+                raise ValidationError(e.detail[0] + ' [assume: item as is = task root with values] ')
             else:
-                raise ValidationError(e.detail[0] + ' [assume: item = {"data": {...}}, item["data"] is task root]')
+                raise ValidationError(e.detail[0] + ' [assume: item["data"] = task root with values]')
 
     def project(self):
         """ Take the project from context
@@ -94,13 +96,6 @@ class TaskValidator:
 
     @staticmethod
     def check_allowed(task):
-        allowed = ['data', 'completions', 'predictions', 'meta', 'id']
-
-        # check each task filled
-        for key in task.keys():
-            if key not in allowed:
-                return False
-
         # task is required
         if 'data' not in task:
             return False

@@ -6,7 +6,7 @@ import pytest
 import unittest
 
 # label_studio
-from label_studio import server
+from label_studio import blueprint as server
 from label_studio.tests.base import (
     test_client, captured_templates, goc_project,
 )
@@ -14,7 +14,6 @@ from label_studio.tests.e2e_actions import (
     prepare,
     action_config, action_config_test,
     action_import, action_import_test,
-    action_get_all_tasks,
     action_get_task,
     action_next_task,
     action_delete_task, action_delete_all_tasks,
@@ -32,7 +31,6 @@ ACTIONS = {
     'config': action_config,
     'import': action_import,
     'get_task': action_get_task,
-    'get_all_tasks': action_get_all_tasks,
     'next_task': action_next_task,
     'delete_task': action_delete_task,
     'delete_all_tasks': action_delete_all_tasks,

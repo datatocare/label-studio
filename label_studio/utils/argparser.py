@@ -94,7 +94,12 @@ def parse_input_args():
     )
     root_parser.add_argument(
         '--host', dest='host', type=str,
-        help='Server port')
+        help='Server hostname for LS internal usage like import task urls generation, sample task urls, etc. '
+             'If you need to start server on localhost instead of 0.0.0.0, just make it "localhost". '
+             'Otherwise web-server host will be 0.0.0.0 always independent of this parameter.')
+    root_parser.add_argument(
+        '--protocol', dest='protocol', type=str,
+        help='Web protocol http:// or https://')
     root_parser.add_argument(
         '-p', '--port', dest='port', type=int,
         help='Server port')
@@ -112,6 +117,9 @@ def parse_input_args():
     root_parser.add_argument(
         '--use-gevent', dest='use_gevent', action='store_true',
         help='Use gevent for better concurrency', default=False)
+    root_parser.add_argument(
+        '--initial-project-description', dest='project_desc',
+        help='Project description to identify project')
 
     parser = argparse.ArgumentParser(description='Label studio')
 

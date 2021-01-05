@@ -102,7 +102,8 @@ class JsonDBStorage(BaseStorage):
         # return max(self.ids(), default=-1)
 
     def items(self):
-        return self.data.items()
+        return
+        # return self.data.items()
 
     def nextTask(self, userID):
         # db.session.query()
@@ -114,6 +115,8 @@ class JsonDBStorage(BaseStorage):
             # print(r['my_column'])  # Access by column name as a string
             # r_dict = dict(r.items())  # convert to dict keyed by column names
             #  return r.__dict_
+        if nextTask is None:
+            return None
         return dict(nextTask.items())
 
     def remove(self, key):

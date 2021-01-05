@@ -156,7 +156,7 @@ class ProjectObj(object):
         all_names = re.findall(r'name="([^"]*)"', config_string)
         if len(set(all_names)) != len(all_names):
             logger.debug(all_names)
-            raise ValidationError('Label config contains non-unique names')
+            raise ValidationError('Label config contains non-unique names ' + str(all_names))
 
         # toName points to existent name
         names = set(all_names)
@@ -333,7 +333,8 @@ class MLApi(BaseHTTPAPI):
             'label_config': project.label_config_line,
             'params': {
                 'login': project.task_data_login,
-                'password': project.task_data_password
+                'password': project.task_data_password,
+                'project_full_path': os.path.abspath(project.path)
             }
         }
         return self._post('train', request)
