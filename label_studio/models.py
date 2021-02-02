@@ -60,6 +60,7 @@ class User(UserMixin, db.Model):
     def __repr__(self):
         return '<User {}>'.format(self.username)
 
+
 class Task(db.Model):
     __tablename__ = 'task'
 
@@ -74,8 +75,7 @@ class Task(db.Model):
         unique=False
     )
 
-    #todo add batch id
-
+    # todo add batch id
     #
     # layout = db.Column(
     #     db.String(2000),
@@ -84,12 +84,19 @@ class Task(db.Model):
     # )
 
     layout_id = db.Column(db.Integer, db.ForeignKey('layout.id'),
-                        nullable=False)
+                          nullable=False)
     groundTruth = db.Column(
         db.String(2000),
         nullable=False,
         unique=False
     )
+
+    format_type = db.Column(db.Integer, default=0)
+    batch_id = db.Column(db.Integer, default=0)
+    description = db.Column(
+        db.String(2000)
+    )
+
 
 class Completion(db.Model):
     __tablename__ = 'completions'
@@ -97,10 +104,36 @@ class Completion(db.Model):
         db.Integer,
         primary_key=True
     )
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'),
-                            nullable=False)
-    task_id = db.Column(db.Integer, db.ForeignKey('task.id'),
-                            nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
+    data = db.Column(
+        db.String(2000),
+        nullable=False,
+        unique=False
+    )
+
+    # hexID =db.Column(
+    #     db.String(2000),
+    #     default="",
+    #     nullable=False,
+    #     unique=False
+    # )
+    completed_at = db.Column(
+        db.BigInteger
+        # default="",
+        # nullable=False,
+        # unique=False
+    )
+
+
+class OldCompletion(db.Model):
+    __tablename__ = 'Oldcompletions'
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
     data = db.Column(
         db.String(2000),
         nullable=False,
@@ -125,6 +158,38 @@ class Layout(db.Model):
     id = db.Column(
         db.Integer,
         primary_key=True
+    )
+
+    data = db.Column(
+        db.String(2000),
+        nullable=False,
+        unique=False
+    )
+
+
+class UserScore(db.Model):
+    __tablename__ = 'user_score'
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    user_id = db.Column(db.Integer)
+    batch_id = db.Column(db.Integer)
+    score = db.Column(db.Float)
+
+
+class TrainingTasks(db.Model):
+    __tablename__ = 'TrainingTasks'
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    text = db.Column(
+        db.String(2000),
+        nullable=False,
+        unique=False
     )
 
     data = db.Column(

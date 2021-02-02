@@ -462,7 +462,7 @@ class Project(object):
             for m in self.ml_backends:
                 m.clear(self)
 
-    def next_task(self, user):
+    def next_task(self, user, traingTask):
         # completed_tasks_ids = set(completed_tasks_ids)
         sampling = self.config.get('sampling', 'sequential')
 
@@ -473,7 +473,7 @@ class Project(object):
             # task_id = next(task_iter, None)
             # if task_id is not None:
             #     return self.source_storage.get(task_id)
-            return self.source_storage.nextTask(user)
+            return self.source_storage.nextTask(user, traingTask)
         # Tasks are sampled with equal probabilities
         elif sampling == 'uniform':
             actual_tasks_ids = list(task_iter)

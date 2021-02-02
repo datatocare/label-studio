@@ -1,11 +1,34 @@
 from .base import BaseStorage
 import logging
 import os
-from label_studio.models import Task
+from label_studio.models import Task, Completion, OldCompletion
 from label_studio import db
 from label_studio.utils.io import json_load
+from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
+
+
+def checkAndgetTrainginTask(userID):
+    q = db.session.query(Task.id).filter(Task.batch_id == 0, Task.format_type != 3).subquery()
+    Taskcount = db.session.query(func.count(Completion.id)).filter(Completion.user_id == userID, Completion.task_id.in_(
+        q)).scalar()  # .delete(synchronize_session='fetch')
+
+    if Taskcount >= 2:
+        print("Here 3", Taskcount)
+        w = db.session.query(Completion).filter(Completion.user_id == userID,
+                                                Completion.task_id.in_(q)).all()  # .delete(synchronize_session='fetch')
+        for r in w:
+            oldc = OldCompletion(user_id=r.user_id, task_id=r.task_id, data=r.data, completed_at=r.completed_at)
+            db.session.add(oldc)
+            db.session.delete(r)
+        db.session.commit()
+
+    nextTask = db.session.execute(
+        'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) order by id',
+        {'userID': userID}).first()
+    return nextTask
+
 
 class JsonDBStorage(BaseStorage):
 
@@ -105,9 +128,30 @@ class JsonDBStorage(BaseStorage):
         return
         # return self.data.items()
 
-    def nextTask(self, userID):
+    def nextTask(self, userID, traingTask):
         # db.session.query()
-        nextTask = db.session.execute('SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) order by id', {'userID': userID}).first()
+        nextTask = tuple
+        # showDemo = 0
+        userScore = db.session.execute(
+            'SELECT score FROM user_score WHERE  user_id = :user_id and batch_id = :batch_id order by id',
+            {'user_id': userID, 'batch_id': 0}).scalar()
+        if traingTask == '1' or userScore is None:
+            nextTask = checkAndgetTrainginTask(userID)
+            # nextTask = db.session.execute(
+            #     'SELECT * FROM TrainingTask WHERE id not in (select task_id from completions where user_id = :userID ) order by id',
+            #       {'userID': userID}).first()
+            # showDemo = 1
+        else:
+            print("Here 5")
+            print("Here 1")
+            print(userScore)
+            if userScore < 80:
+                nextTask = checkAndgetTrainginTask(userID)
+            else:
+                nextTask = db.session.execute(
+                    'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) order by id',
+                    {'userID': userID}).first()
+
         # logger.debug(nextTask)
         # logger.debug(type(nextTask))
         # for r in nextTask:
@@ -117,7 +161,9 @@ class JsonDBStorage(BaseStorage):
             #  return r.__dict_
         if nextTask is None:
             return None
-        return dict(nextTask.items())
+        dictTask = dict(nextTask.items())
+        # dictTask["showDemo"] = showDemo
+        return dictTask
 
     def remove(self, key):
         task = self.get(int(key))

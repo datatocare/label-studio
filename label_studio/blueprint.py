@@ -57,7 +57,7 @@ from label_studio.storage import get_storage_form
 from label_studio.project import Project
 from label_studio.tasks import Tasks
 from label_studio.utils.data_manager import prepare_tasks
-from label_studio.models import User, Completion, Layout
+from label_studio.models import User, Completion, Layout, UserScore
 from label_studio import db
 
 INPUT_ARGUMENTS_PATH = pathlib.Path("server.json")
@@ -248,7 +248,7 @@ def labeling_page():
     # task data: load task or task with completions if it exists
     task_data = None
     task_id = request.args.get('task_id', None)
-
+    user_id = flask_login.current_user.get_id()
     if task_id is not None:
         task_id = int(task_id)
         # Task explore mode
@@ -258,7 +258,7 @@ def labeling_page():
         if g.project.ml_backends_connected:
             task_data = g.project.make_predictions(task_data)
     else:
-        task = g.project.next_task(flask_login.current_user.get_id())
+        task = g.project.next_task(user_id, '0')
         if task is not None:
             # no tasks found
             Newtask = {}
@@ -266,17 +266,29 @@ def labeling_page():
             Newtask['id'] = task['id']
             db_layout = Layout.query.filter_by(id=task['layout_id']).first()
             Newtask['layout'] = db_layout.data  # task['layout']
+            Newtask['description'] = task['description']
+            # Newtask['showDemo'] = task['showDemo']
             task = Newtask
             ar = {}
             ar["type"] = 3
             ar["message"] = "Give your Answer"
             task["taskAnswerResponse"] = ar
+            task["format_type"] = Newtask['data']['format_type']
+            # if "result" in task["data"]:
+            # completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(), task_id=task_id).first()
+            # if completion is not None:
+            #     completionData = json.loads(task["data"]["result"])
+            #     completionData['id'] = 1
+                # logger.debug(json.dumps(json.loads(completion.data), indent=2))
+                # task["completions"] = [completionData]  # [json.loads(completion.data)]
+
             # task = resolve_task_data_uri(task)
 
             task = resolve_task_data_uri(task, project=g.project)
         else:
             task = {}
             task['layout'] = g.project.label_config_line
+        logger.debug(json.dumps(task, indent=2))
     return flask.render_template(
         'labeling.html',
         project=g.project,
@@ -285,6 +297,7 @@ def labeling_page():
         task_id=task_id,
         task_data=task_data,
         user=flask_login.current_user,
+        # showDemo=task['showDemo'],
         **find_editor_files()
     )
 
@@ -588,6 +601,7 @@ def api_project():
     if request.method == 'POST' and request.args.get('new', False):
         input_args.web_gui_project_desc = request.args.get('desc')
         g.project = project_get_or_create(multi_session_force_recreate=True)
+        delattr(input_args, 'web_gui_project_desc')  # remove it to avoid other users affecting
         code = 201
 
     # update project params, ml backend settings
@@ -719,7 +733,12 @@ def api_generate_next_task():
     # try to find task is not presented in completions
     # completed_tasks_ids = g.project.get_completions_ids()
     # task = g.project.next_task(completed_tasks_ids)
-    task = g.project.next_task(flask_login.current_user.get_id())
+    traingTask = request.values.get('traingTask', False)
+    # if was_cancelled:
+        # ['was_cancelled'] = True
+    # if traingTask == 1:
+
+    task = g.project.next_task(flask_login.current_user.get_id(), traingTask)
 
     if task is None:
         # no tasks found
@@ -729,7 +748,17 @@ def api_generate_next_task():
     Newtask['id'] = task['id']
     db_layout = Layout.query.filter_by(id=task['layout_id']).first()
     Newtask['layout'] = db_layout.data #task['layout']
+    Newtask['description'] = task['description']
     task = Newtask
+    task["format_type"] = Newtask['data']['format_type']
+    # if "result" in task["data"]:
+        # completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(), task_id=task_id).first()
+        # if completion is not None:
+        # completionData = json.loads(task["data"]["result"])
+        # completionData['id'] = 1
+        # logger.debug(json.dumps(json.loads(completion.data), indent=2))
+        # task["completions"] = [completionData]  # [json.loads(completion.data)]
+
     ar = {}
     ar["type"] = 3
     ar["message"] = "Give your Answer"
@@ -939,6 +968,19 @@ def api_tasks_completions(task_id):
 
         completion["user"] =  flask_login.current_user.get_id()
         completion_id = g.project.save_completion_in_DB(task_id, completion)
+        # checkscore(completion)
+        userScore = UserScore.query.filter_by(user_id=completion["user"], batch_id=0).first()
+            # db.session.execute(
+            # 'SELECT score FROM user_score WHERE  user_id = :user_id and batch_id = :batch_id order by id',
+            # {'user_id': completion["user"], 'batch_id': 0}).scalar()
+        if userScore is not None:
+            userScore.score = userScore.score + 10
+        else:
+            userScore.score = 25
+
+        db.session.add(userScore)
+        db.session.commit()
+
         logger.debug("Received completion" + json.dumps(completion, indent=2))
         logger.debug(completion_id)
         # completion_id = g.project.save_completion(task_id, completion)
@@ -951,6 +993,7 @@ def api_tasks_completions(task_id):
             return make_response('deleted', 204)
         else:
             return make_response({'detail': 'Completion removing is not allowed in server config'}, 422)
+
 
 
 @blueprint.route('/api/tasks/<task_id>/completions/<completion_id>', methods=['PATCH', 'DELETE'])

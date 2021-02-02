@@ -11,6 +11,7 @@ const API_URL = {
   COMPLETIONS: "/completions",
   CANCEL: "?was_cancelled=1",
   NEXT: "/next",
+    TraingTask: "?traingTask=",
   INSTRUCTION: "/project?fields=instruction"
 };
 
@@ -111,8 +112,18 @@ const _loadTask = function(ls, url, reset,completionID) {
                     response.completionID = completionID
                     ls.resetState();
                     delete window.LSF_SDK;
-                    window.LSF_SDK = LSF_SDK("label-studio", response.layout, null, false, null, true, response);
+                    window.LSF_SDK = LSF_SDK("label-studio", response.layout, null, false, response.data.description, true, response);
                     // ls = window.LSF_SDK;
+                    if (window.LSF_SDK.task && window.LSF_SDK.task.dataObj.format_type == 1 ) {
+                        var Skipbtn = $('.ls-skip-btn').children().first();
+                        Skipbtn.html('').append ("<span>Show me More </span>");
+                        var Updatebtn = $('.ls-update-btn').children().first().next();
+                        Updatebtn.html('').append ("<span>Got it </span>");
+
+                        var Submitbtn = $('.ls-submit-btn').children().first().next();
+                        Submitbtn.html('').append ("<span>Got it </span>");
+                    }
+
                 }
                 else {
                     /**
@@ -122,6 +133,10 @@ const _loadTask = function(ls, url, reset,completionID) {
                 ls.resetState();
                 ls.assignTask(response);
                 ls.initializeStore(_convertTask(response));
+                ls.updateDescription(response.description);
+                // if (response.format_type == 3) {
+                //     ls.toggleDescription();
+                // }
                 let cs = ls.completionStore;
                 let c;
 
@@ -135,6 +150,10 @@ const _loadTask = function(ls, url, reset,completionID) {
 
                 // we are on history item, take completion id from history
                 else if (ls.completionStore.completions.length > 0 && completionID) {
+                    c = {id: 1};
+                }
+
+                else if (ls.completionStore.completions.length > 0 && response.format_type == 1) {
                     c = {id: completionID};
                 }
 
@@ -158,9 +177,9 @@ const _loadTask = function(ls, url, reset,completionID) {
     }
 };
 
-const loadNext = function(ls, rest) {
-  var url = `${API_URL.MAIN}${API_URL.PROJECT}${API_URL.NEXT}`;
-  return _loadTask(ls, url,rest);
+const loadNext = function(ls, rest, trainingTask) {
+  var url = `${API_URL.MAIN}${API_URL.PROJECT}${API_URL.NEXT}${API_URL.TraingTask}${trainingTask}`;
+  return _loadTask(ls, url, rest);
 };
 
 const loadTask = function(ls, taskID, completionID,reset=false) {
@@ -229,10 +248,10 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
       "submit", // submit button on controls
       "update", // update button on controls
       "predictions",
-   //   "predictions:menu", // right menu with prediction items
-    //  "completions:menu", // right menu with completion items
-     // "completions:add-new",
-     // "completions:delete",
+     "predictions:menu", // right menu with prediction items
+     "completions:menu", // right menu with completion items
+     "completions:add-new",
+     "completions:delete",
       "side-column", // entity
       "skip",
        "leaderboad",
@@ -241,6 +260,18 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
   if (!hide_skip) {
     interfaces.push('skip');
   }
+
+  // if (task != null && task.type == 3) {
+  //     interfaces.push("predictions");
+  //    interfaces.push("predictions:menu"); // right menu with prediction items
+  //    interfaces.push("completions:menu"); // right menu with completion items
+  //    interfaces.push("completions:add-new");
+  //    interfaces.push("completions:delete");
+  //    interfaces.push("side-column"); // entity
+  //    interfaces.push("skip");
+  //    interfaces.push("leaderboad");
+  //    interfaces.push("messages");
+  // }
 
   var LS = new LabelStudio(elid, {
     config: config,
@@ -271,7 +302,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
           if (task) {
             ls.setFlags({ isLoading: false });
           } else {
-            loadNext(ls, true);
+            loadNext(ls, true, 0);
           }
         });
       });
@@ -279,8 +310,17 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
       return true;
     },
 
-    onTaskLoad: function(ls) {
+    onTaskLoad: function(ls, task) {
       // render back & next buttons if there are history
+        if (task && task.dataObj.format_type == 1 ) {
+            var Skipbtn = $('.ls-skip-btn').children().first();
+            Skipbtn.html('').append ("<span>Show me More </span>");
+            var Updatebtn = $('.ls-update-btn').children().first().next();
+            Updatebtn.html('').append ("<span>Got it </span>");
+
+            var Submitbtn = $('.ls-submit-btn').children().first().next();
+            Submitbtn.html('').append ("<span>Got it </span>");
+        }
       if (showHistory && ls.taskHistoryIds && ls.taskHistoryIds.length > 0) {
         var firstBlock = $('[class^=Panel_container]').children().first();
         var className = firstBlock.attr('class');
@@ -343,7 +383,11 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
             // refresh task from server
             // loadTask(ls, ls.task.id, res.id);
           // } else {
-            loadNext(ls,true);
+            if (ls.task.dataObj.format_type == 1) {
+                loadNext(ls,true, 1);
+            } else {
+                loadNext(ls, true, 0);
+            }
           // }
         })
       });
@@ -366,7 +410,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
       if (reset == false) {
           if (!task) {
               ls.setFlags({isLoading: true});
-              loadNext(ls, false);
+              loadNext(ls, false, 0);
           // }
           } else {
             if (!task.completions || task.completions.length === 0) {
@@ -377,13 +421,15 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
             //     ls.addUserRanks(task.userranks);
             // }
           }
-      }   else {
+      } else {
+
         response.data = JSON.stringify(response.data);
         ls.setFlags({isLoading: false});
         ls.resetState();
         ls.assignTask(response);
         cTask = _convertTask(response);
         ls.initializeStore(cTask);
+
         let cs = ls.completionStore;
         let c;
         if (cs.predictions.length > 0) {
@@ -400,7 +446,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
         }
 
         if (c.id) cs.selectCompletion(c.id);
-           // ls.onTaskLoad(ls, response);
+           ls.onTaskLoad(ls, ls.task);
       }
     }
   });
@@ -421,7 +467,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
             loadTask(LS, prev.task_id, prev.completion_id);
           }
           else {
-            loadNext(LS, true);  // new task
+            loadNext(LS, true, 0);  // new task
           }
       }
   };
