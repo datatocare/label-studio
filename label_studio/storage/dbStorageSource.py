@@ -25,7 +25,7 @@ def checkAndgetTrainginTask(userID):
         db.session.commit()
 
     nextTask = db.session.execute(
-        'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) order by id',
+        'SELECT * FROM TrainingTask WHERE id not in (select task_id from completions where user_id = :userID ) order by id',
         {'userID': userID}).first()
     return nextTask
 
@@ -145,7 +145,7 @@ class JsonDBStorage(BaseStorage):
             print("Here 5")
             print("Here 1")
             print(userScore)
-            if userScore < 80:
+            if userScore < 20:
                 nextTask = checkAndgetTrainginTask(userID)
             else:
                 nextTask = db.session.execute(

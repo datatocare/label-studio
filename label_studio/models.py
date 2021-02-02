@@ -179,7 +179,7 @@ class UserScore(db.Model):
     score = db.Column(db.Float)
 
 
-class TrainingTasks(db.Model):
+class TrainingTask(db.Model):
     __tablename__ = 'TrainingTasks'
     id = db.Column(
         db.Integer,
