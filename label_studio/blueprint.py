@@ -951,7 +951,7 @@ def api_tasks_completions(task_id):
     """ Save new completion or delete all completions
     """
     task_id = int(task_id)
-
+    user = flask_login.current_user.get_id()
     # save completion
     if request.method == 'POST':
         completion = request.json
@@ -960,26 +960,23 @@ def api_tasks_completions(task_id):
         was_cancelled = request.values.get('was_cancelled', False)
         if was_cancelled:
             completion['was_cancelled'] = True
+            userScore = UserScore.query.filter_by(user_id=user, batch_id=0).first()
+            if userScore is not None:
+                userScore.score = userScore.score + 10
+            else:
+                us = UserScore(user_id=user,batch_id=0,score=20)
+                userScore = us
 
-        # regular completion
+            db.session.add(userScore)
+            db.session.commit()
+
         else:
             completion.pop('skipped', None)  # deprecated
             completion.pop('was_cancelled', None)
 
-        completion["user"] =  flask_login.current_user.get_id()
+        completion["user"] =  user
         completion_id = g.project.save_completion_in_DB(task_id, completion)
         # checkscore(completion)
-        userScore = UserScore.query.filter_by(user_id=completion["user"], batch_id=0).first()
-            # db.session.execute(
-            # 'SELECT score FROM user_score WHERE  user_id = :user_id and batch_id = :batch_id order by id',
-            # {'user_id': completion["user"], 'batch_id': 0}).scalar()
-        if userScore is not None:
-            userScore.score = userScore.score + 10
-        else:
-            userScore.score = 25
-
-        db.session.add(userScore)
-        db.session.commit()
 
         logger.debug("Received completion" + json.dumps(completion, indent=2))
         logger.debug(completion_id)
