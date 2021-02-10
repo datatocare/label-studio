@@ -133,7 +133,7 @@ class JsonDBStorage(BaseStorage):
         nextTask = tuple
         # showDemo = 0
         userDemoFlag = UserScore.query.filter_by(user_id=userID, batch_id=0).first()
-        if userDemoFlag == True or traingTask == '1':
+        if userDemoFlag == None or userDemoFlag.showDemo == True or traingTask == '1':
             nextTask = checkAndgetTrainginTask(userID)
             # nextTask = db.session.execute(
             #     'SELECT * FROM TrainingTask WHERE id not in (select task_id from completions where user_id = :userID ) order by id',

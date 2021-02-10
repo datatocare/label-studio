@@ -177,7 +177,7 @@ class UserScore(db.Model):
     user_id = db.Column(db.Integer)
     batch_id = db.Column(db.Integer)
     score = db.Column(db.Float)
-
+    showDemo = db.Column(db.Boolean, default=True)
 
 class TrainingTask(db.Model):
     __tablename__ = 'TrainingTasks'
@@ -197,6 +197,4 @@ class TrainingTask(db.Model):
         nullable=False,
         unique=False
     )
-
-    showDemo = db.Column(db.Boolean, default=True)
 

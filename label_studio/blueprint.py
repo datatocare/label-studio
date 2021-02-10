@@ -967,7 +967,7 @@ def api_tasks_completions(task_id):
             if userScore is not None:
                 userScore.score = userScore.score + 10
             else:
-                us = UserScore(user_id=user, batch_id=0, score=20)
+                us = UserScore(user_id=user, batch_id=0, score=20, showDemo = False)
                 userScore = us
 
             db.session.add(userScore)
