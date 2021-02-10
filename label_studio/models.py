@@ -197,3 +197,6 @@ class TrainingTask(db.Model):
         nullable=False,
         unique=False
     )
+
+    showDemo = db.Column(db.Boolean, default=True)
+

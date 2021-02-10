@@ -247,15 +247,15 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
       "controls", // all control buttons: skip, submit, update
       "submit", // submit button on controls
       "update", // update button on controls
-      "predictions",
-     "predictions:menu", // right menu with prediction items
-     "completions:menu", // right menu with completion items
-     "completions:add-new",
-     "completions:delete",
-      "side-column", // entity
-      "skip",
-       "leaderboad",
-       "messages",
+          // "predictions",
+         // "predictions:menu", // right menu with prediction items
+         "completions:menu", // right menu with completion items
+         // "completions:add-new",
+         // "completions:delete",
+          "side-column", // entity
+          "skip",
+           "leaderboad",
+           "messages",
   ];
   if (!hide_skip) {
     interfaces.push('skip');

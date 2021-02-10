@@ -1,7 +1,7 @@
 from .base import BaseStorage
 import logging
 import os
-from label_studio.models import Task, Completion, OldCompletion
+from label_studio.models import Task, Completion, OldCompletion, UserScore
 from label_studio import db
 from label_studio.utils.io import json_load
 from sqlalchemy import func
@@ -56,7 +56,7 @@ class JsonDBStorage(BaseStorage):
                     # logger.debug(type(task))
                     # logger.debug(task["data"])
 
-                    dbtask = Task(text= task["data"]["text"],layout=task["data"]["layout"],groundTruth=task["data"]["groundTruth"])
+                    dbtask = Task(text= task["data"]["text"], layout=task["data"]["layout"], groundTruth=task["data"]["groundTruth"])
                     db.session.add(dbtask)
                     db.session.commit()
                 except Exception as e:
@@ -132,25 +132,23 @@ class JsonDBStorage(BaseStorage):
         # db.session.query()
         nextTask = tuple
         # showDemo = 0
-        userScore = db.session.execute(
-            'SELECT score FROM user_score WHERE  user_id = :user_id and batch_id = :batch_id order by id',
-            {'user_id': userID, 'batch_id': 0}).scalar()
-        if traingTask == '1' or userScore is None:
+        userDemoFlag = UserScore.query.filter_by(user_id=userID, batch_id=0).first()
+        if userDemoFlag == True or traingTask == '1':
             nextTask = checkAndgetTrainginTask(userID)
             # nextTask = db.session.execute(
             #     'SELECT * FROM TrainingTask WHERE id not in (select task_id from completions where user_id = :userID ) order by id',
             #       {'userID': userID}).first()
             # showDemo = 1
         else:
-            print("Here 5")
-            print("Here 1")
-            print(userScore)
-            if userScore < 20:
-                nextTask = checkAndgetTrainginTask(userID)
-            else:
-                nextTask = db.session.execute(
-                    'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) order by id',
-                    {'userID': userID}).first()
+            # print("Here 5")
+            # print("Here 1")
+            # print(userScore)
+            # if userScore < 20:
+            #     nextTask = checkAndgetTrainginTask(userID)
+            # else:
+            nextTask = db.session.execute(
+                'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) order by id',
+                {'userID': userID}).first()
 
         # logger.debug(nextTask)
         # logger.debug(type(nextTask))

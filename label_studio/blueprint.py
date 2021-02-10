@@ -960,19 +960,19 @@ def api_tasks_completions(task_id):
         was_cancelled = request.values.get('was_cancelled', False)
         if was_cancelled:
             completion['was_cancelled'] = True
+        else:
+            completion.pop('skipped', None)  # deprecated
+            completion.pop('was_cancelled', None)
             userScore = UserScore.query.filter_by(user_id=user, batch_id=0).first()
             if userScore is not None:
                 userScore.score = userScore.score + 10
             else:
-                us = UserScore(user_id=user,batch_id=0,score=20)
+                us = UserScore(user_id=user, batch_id=0, score=20)
                 userScore = us
 
             db.session.add(userScore)
             db.session.commit()
 
-        else:
-            completion.pop('skipped', None)  # deprecated
-            completion.pop('was_cancelled', None)
 
         completion["user"] =  user
         completion_id = g.project.save_completion_in_DB(task_id, completion)
