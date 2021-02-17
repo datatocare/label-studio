@@ -1,7 +1,7 @@
 from .base import BaseStorage
 import logging
 import os
-from label_studio.models import Task, Completion, OldCompletion, UserScore
+from label_studio.models import Task, Completion, OldCompletion, UserScore, TrainingTask
 from label_studio import db
 from label_studio.utils.io import json_load
 from sqlalchemy import func
@@ -9,8 +9,15 @@ from sqlalchemy import func
 logger = logging.getLogger(__name__)
 
 
-def checkAndgetTrainginTask(userID):
-    q = db.session.query(Task.id).filter(Task.batch_id == 0, Task.format_type != 3).subquery()
+def checkAndgetTrainginTask(userID, batchid):
+    q = db.session.query(Task.id).filter(Task.batch_id == batchid, Task.format_type == 1).subquery()
+    # Task1 = db.session.query(Completion.task_id).filter(Completion.user_id == userID, Completion.task_id.in_(
+    #     q))  # .delete(synchronize_session='fetch')
+    # q1 = db.session.query(Task.id).filter(Task.batch_id == batchid, Task.format_type == 1).all()
+    # for i in q1:
+    #     print(i)
+    # Taskidcompleted = db.session.query(Completion.task_id).filter(Completion.user_id == userID, Completion.task_id.in_(
+    #     q)).subquery()  # .delete(synchronize_session='fetch')
     Taskcount = db.session.query(func.count(Completion.id)).filter(Completion.user_id == userID, Completion.task_id.in_(
         q)).scalar()  # .delete(synchronize_session='fetch')
 
@@ -23,10 +30,12 @@ def checkAndgetTrainginTask(userID):
             db.session.add(oldc)
             db.session.delete(r)
         db.session.commit()
-
+    # nextTask = db.session.query(Task).filter(Task.batch_id==batchid, Task.format_type == 1, Task.id.notin_(Taskidcompleted)).first()
     nextTask = db.session.execute(
-        'SELECT * FROM TrainingTask WHERE id not in (select task_id from completions where user_id = :userID ) order by id',
-        {'userID': userID}).first()
+        'SELECT * FROM Task WHERE batch_id=:batchid and Task.format_type == 1 and '
+        'id not in (select task_id from completions where user_id = :userID and '
+        'task_id in (select id from Task where batch_id= :batchid and Task.format_type == 1) ) order by id',
+        {'userID': userID,'batchid':batchid }).first()
     return nextTask
 
 
@@ -128,13 +137,14 @@ class JsonDBStorage(BaseStorage):
         return
         # return self.data.items()
 
-    def nextTask(self, userID, traingTask):
+    def nextTask(self, userID, traingTask, batchid):
         # db.session.query()
         nextTask = tuple
         # showDemo = 0
-        userDemoFlag = UserScore.query.filter_by(user_id=userID, batch_id=0).first()
+
+        userDemoFlag = UserScore.query.filter_by(user_id=userID, batch_id=batchid).first()
         if userDemoFlag == None or userDemoFlag.showDemo == True or traingTask == '1':
-            nextTask = checkAndgetTrainginTask(userID)
+            nextTask = checkAndgetTrainginTask(userID, batchid)
             # nextTask = db.session.execute(
             #     'SELECT * FROM TrainingTask WHERE id not in (select task_id from completions where user_id = :userID ) order by id',
             #       {'userID': userID}).first()
@@ -147,8 +157,8 @@ class JsonDBStorage(BaseStorage):
             #     nextTask = checkAndgetTrainginTask(userID)
             # else:
             nextTask = db.session.execute(
-                'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) order by id',
-                {'userID': userID}).first()
+                'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid  order by id',
+                {'userID': userID, 'batchid': batchid}).first()
 
         # logger.debug(nextTask)
         # logger.debug(type(nextTask))

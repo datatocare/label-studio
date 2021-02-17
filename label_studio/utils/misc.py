@@ -372,7 +372,7 @@ def start_browser(ls_url, no_browser):
     if no_browser:
         return
 
-    browser_url = ls_url + '/'
+    browser_url = ls_url + '/batches'
     threading.Timer(2.5, lambda: webbrowser.open(browser_url)).start()
     print('Start browser at URL: ' + browser_url)
 

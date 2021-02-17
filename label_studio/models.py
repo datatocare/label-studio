@@ -49,6 +49,8 @@ class User(UserMixin, db.Model):
         nullable=True
     )
 
+    is_admin = db.Column(db.Boolean, default=False)
+
     def set_password(self, password):
         """Create hashed password."""
         self.password = generate_password_hash(password, method='sha256')
@@ -180,7 +182,7 @@ class UserScore(db.Model):
     showDemo = db.Column(db.Boolean, default=True)
 
 class TrainingTask(db.Model):
-    __tablename__ = 'TrainingTasks'
+    __tablename__ = 'TrainingTask'
     id = db.Column(
         db.Integer,
         primary_key=True
@@ -197,4 +199,41 @@ class TrainingTask(db.Model):
         nullable=False,
         unique=False
     )
+
+    layout_id = db.Column(db.Integer, db.ForeignKey('layout.id'),
+                          nullable=False)
+    groundTruth = db.Column(
+        db.String(2000),
+        nullable=False,
+        unique=False
+    )
+
+    format_type = db.Column(db.Integer, default=0)
+    batch_id = db.Column(db.Integer, default=0)
+    description = db.Column(
+        db.String(2000)
+    )
+
+class BatchData(db.Model):
+    __tablename__ = 'BatchData'
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    data = db.Column(
+        db.String(2000),
+        nullable=False,
+    )
+
+    hexID = db.Column(
+        db.String(2000),
+        nullable=False,
+    )
+
+    Type = db.Column(
+        db.String(2000),
+        nullable=False,
+    )
+
 

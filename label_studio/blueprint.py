@@ -57,7 +57,7 @@ from label_studio.storage import get_storage_form
 from label_studio.project import Project
 from label_studio.tasks import Tasks
 from label_studio.utils.data_manager import prepare_tasks
-from label_studio.models import User, Completion, Layout, UserScore
+from label_studio.models import User, Completion, Layout, UserScore, Task, BatchData
 from label_studio import db
 
 INPUT_ARGUMENTS_PATH = pathlib.Path("server.json")
@@ -236,59 +236,68 @@ def samples_time_series():
     )
 
 
-@blueprint.route('/')
+@blueprint.route('/<batchid>')
+@blueprint.route('/', defaults={"batchid": '0'})
 @flask_login.login_required
 @exception_handler_page
-def labeling_page():
+def labeling_page(batchid = '0'):
     """ Label stream for tasks
     """
-    if g.project.no_tasks():
-        return redirect(url_for('label_studio.welcome_page'))
+    if batchid == '0':
+        return redirect(flask.url_for('label_studio.batches_page'))
+
+    # if g.project.no_tasks():
+    #     return redirect(url_for('label_studio.welcome_page'))
 
     # task data: load task or task with completions if it exists
-    task_data = None
-    task_id = request.args.get('task_id', None)
-    user_id = flask_login.current_user.get_id()
-    if task_id is not None:
-        task_id = int(task_id)
-        # Task explore mode
-        task_data = g.project.get_task_with_completions(task_id) or g.project.source_storage.get(task_id)
-        task_data = resolve_task_data_uri(task_data, project=g.project)
-
-        if g.project.ml_backends_connected:
-            task_data = g.project.make_predictions(task_data)
+    batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
+    if batch_id is None:
+        return redirect(flask.url_for('label_studio.invalid_page'))
     else:
-        task = g.project.next_task(user_id, '0')
-        if task is not None:
-            # no tasks found
-            Newtask = {}
-            Newtask['data'] = task
-            Newtask['id'] = task['id']
-            db_layout = Layout.query.filter_by(id=task['layout_id']).first()
-            Newtask['layout'] = db_layout.data  # task['layout']
-            Newtask['description'] = task['description']
-            # Newtask['showDemo'] = task['showDemo']
-            task = Newtask
-            ar = {}
-            ar["type"] = 3
-            ar["message"] = "Give your Answer"
-            task["taskAnswerResponse"] = ar
-            task["format_type"] = Newtask['data']['format_type']
-            # if "result" in task["data"]:
-            # completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(), task_id=task_id).first()
-            # if completion is not None:
-            #     completionData = json.loads(task["data"]["result"])
-            #     completionData['id'] = 1
-                # logger.debug(json.dumps(json.loads(completion.data), indent=2))
-                # task["completions"] = [completionData]  # [json.loads(completion.data)]
+        task_data = None
+        task_id = request.args.get('task_id', None)
+        user_id = flask_login.current_user.get_id()
 
-            # task = resolve_task_data_uri(task)
+        if task_id is not None:
+            task_id = int(task_id)
+            # Task explore mode
+            task_data = g.project.get_task_with_completions(task_id) or g.project.source_storage.get(task_id)
+            task_data = resolve_task_data_uri(task_data, project=g.project)
 
-            task = resolve_task_data_uri(task, project=g.project)
+            if g.project.ml_backends_connected:
+                task_data = g.project.make_predictions(task_data)
         else:
-            task = {}
-            task['layout'] = g.project.label_config_line
-        logger.debug(json.dumps(task, indent=2))
+            task = g.project.next_task(user_id, '0', batch_id)
+            if task is not None:
+                # no tasks found
+                Newtask = {}
+                Newtask['data'] = task
+                Newtask['id'] = task['id']
+                db_layout = Layout.query.filter_by(id=task['layout_id']).first()
+                Newtask['layout'] = db_layout.data  # task['layout']
+                Newtask['description'] = task['description']
+                # Newtask['showDemo'] = task['showDemo']
+                task = Newtask
+                ar = {}
+                ar["type"] = 3
+                ar["message"] = "Give your Answer"
+                task["taskAnswerResponse"] = ar
+                task["format_type"] = Newtask['data']['format_type']
+                # if "result" in task["data"]:
+                # completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(), task_id=task_id).first()
+                # if completion is not None:
+                #     completionData = json.loads(task["data"]["result"])
+                #     completionData['id'] = 1
+                    # logger.debug(json.dumps(json.loads(completion.data), indent=2))
+                    # task["completions"] = [completionData]  # [json.loads(completion.data)]
+
+                # task = resolve_task_data_uri(task)
+
+                task = resolve_task_data_uri(task, project=g.project)
+            else:
+                task = {}
+                task['layout'] = g.project.label_config_line
+            logger.debug(json.dumps(task, indent=2))
     return flask.render_template(
         'labeling.html',
         project=g.project,
@@ -297,6 +306,7 @@ def labeling_page():
         task_id=task_id,
         task_data=task_data,
         user=flask_login.current_user,
+        batchid=batchid,
         # showDemo=task['showDemo'],
         **find_editor_files()
     )
@@ -317,6 +327,48 @@ def welcome_page():
         user=flask_login.current_user
     )
 
+@blueprint.route('/noAuth')
+@flask_login.login_required
+@exception_handler_page
+def not_authorised_page():
+    return flask.render_template(
+        'NoAuth.html',
+        config=g.project.config,
+        project=g.project,
+        on_boarding=g.project.on_boarding,
+        user=flask_login.current_user
+    )
+
+@blueprint.route('/invalid')
+@flask_login.login_required
+@exception_handler_page
+def invalid_page():
+    return flask.render_template(
+        'InvalidPage.html',
+        config=g.project.config,
+        project=g.project,
+        on_boarding=g.project.on_boarding,
+        user=flask_login.current_user
+    )
+
+@blueprint.route('/batches')
+@flask_login.login_required
+@exception_handler_page
+def batches_page():
+    """ On-boarding page
+    """
+
+    is_admin = flask_login.current_user.__getattr__("is_admin")
+    batches = db.session.execute("select * from BatchData")
+    batches = batches.fetchall()
+
+    return flask.render_template(
+        'batches.html',
+        batches=batches,
+        project=g.project,
+        config=g.project.config,
+        user=flask_login.current_user
+    )
 
 @blueprint.route('/tasks', methods=['GET', 'POST'])
 @flask_login.login_required
@@ -324,6 +376,12 @@ def welcome_page():
 def tasks_page():
     """ Tasks and completions page
     """
+    batchid = request.args.get('batchid', None)
+    if batchid is None:
+        return redirect(flask.url_for('label_studio.invalid_page'))
+    batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
+    if batch_id is None:
+        return redirect(flask.url_for('label_studio.invalid_page'))
     serialized_project = g.project.serialize()
     serialized_project['multi_session_mode'] = current_app.label_studio.input_args.command != 'start-multi-session'
     return flask.render_template(
@@ -332,6 +390,7 @@ def tasks_page():
         project=g.project,
         serialized_project=serialized_project,
         user=flask_login.current_user,
+        batchid=batchid,
         **find_editor_files()
     )
 
@@ -342,6 +401,10 @@ def tasks_page():
 def setup_page():
     """ Setup labeling config
     """
+
+    if not flask_login.current_user.is_admin:
+        return redirect(flask.url_for('label_studio.not_authorised_page'))
+
     input_values = {}
     project = g.project
     input_args = current_app.label_studio.input_args
@@ -401,6 +464,22 @@ def import_page():
         project=g.project
     )
 
+@blueprint.route('/importTasks')
+@flask_login.login_required
+@exception_handler_page
+def import_Task_page():
+# def import_Task_page():
+    """ Import tasks from JSON, CSV, ZIP and more
+    """
+    if not flask_login.current_user.is_admin:
+        return redirect(flask.url_for('label_studio.not_authorised_page'))
+
+    return flask.render_template(
+        'importTasks.html',
+        config=g.project.config,
+        user=flask_login.current_user,
+        project=g.project,
+    )
 
 @blueprint.route('/export')
 @flask_login.login_required
@@ -423,6 +502,9 @@ def export_page():
 def model_page():
     """ Machine learning backends page
     """
+    if not flask_login.current_user.is_admin:
+        return redirect(flask.url_for('label_studio.not_authorised_page'))
+
     ml_backends = []
     for ml_backend in g.project.ml_backends:
         if ml_backend.connected:
@@ -701,6 +783,67 @@ def api_import():
     }), status.HTTP_201_CREATED)
 
 
+@blueprint.route('/api/project/importTasks', methods=['POST'])
+@flask_login.login_required
+@exception_handler
+def api_task_import():
+    """ The main API for task import, supports
+        * json task data
+        * files (as web form, files will be hosted by this flask server)
+        * url links to images, audio, csv (if you use TimeSeries in labeling config)
+    """
+    # make django compatibility for uploader module
+    class DjangoRequest:
+        def __init__(self): pass
+        POST = request.form
+        GET = request.args
+        FILES = request.files
+        data = request.json if request.json else request.form
+        content_type = request.content_type
+
+    start = time.time()
+    # get tasks from request
+    parsed_data, formats = uploader.load_tasks(DjangoRequest(), g.project)
+    # validate tasks
+    # validator = TaskValidator(g.project)
+    # try:
+    #     new_tasks = validator.to_internal_value(parsed_data)
+    # except ValidationError as e:
+    #     return make_response(jsonify(e.msg_to_list()), status.HTTP_400_BAD_REQUEST)
+    new_Task_List = []
+    # i = 0
+    uploadType = request.args.get('uploadType')
+    i = 0
+    try:
+        if uploadType == "tasks":
+            for task in parsed_data:
+                task = task["data"]
+                dbtask = Task(text=task["text"], layout_id=task["layout_id"], groundTruth=task["groundTruth"],
+                              format_type=task["format_type"], batch_id=task["batch_id"], description=task["description"])
+                # new_Task_List[i] = dbtask
+                i = i + 1
+                # new_Task_List.append(dbtask)
+                db.session.add(dbtask)
+        elif uploadType == "layout":
+            for layout in parsed_data:
+                i = i + 1
+                layout = layout["data"]
+                dblayout = Layout(data=layout["data"])
+                db.session.add(dblayout)
+        else:
+            return make_response("Invalid Type ", status.HTTP_400_BAD_REQUEST)
+
+        db.session.commit()
+        duration = time.time() - start
+        return make_response(jsonify({
+            'task_count': i,
+            'duration': duration,
+            'formats': uploadType,
+        }), status.HTTP_201_CREATED)
+
+    except Exception as exc:
+        return make_response(str(exc), status.HTTP_400_BAD_REQUEST)
+
 @blueprint.route('/api/project/export', methods=['GET'])
 @flask_login.login_required
 @exception_handler
@@ -724,21 +867,24 @@ def api_export():
     return response
 
 
-@blueprint.route('/api/project/next', methods=['GET'])
+# @blueprint.route('/api/project/next', defaults={"batchid": '0'}, methods=['GET'])
+@blueprint.route('/api/project/next/<batchid>/', methods=['GET'])
 @flask_login.login_required
 @exception_handler
-def api_generate_next_task():
+def api_generate_next_task(batchid):
     """ Generate next task for labeling page (label stream)
     """
     # try to find task is not presented in completions
     # completed_tasks_ids = g.project.get_completions_ids()
     # task = g.project.next_task(completed_tasks_ids)
+    # if batchid == '0':
+    #     return make_response('', 404)
+    # print(batchid)
+    batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
+    if batch_id is None:
+        return make_response('', 404)
     traingTask = request.values.get('traingTask', False)
-    # if was_cancelled:
-        # ['was_cancelled'] = True
-    # if traingTask == 1:
-
-    task = g.project.next_task(flask_login.current_user.get_id(), traingTask)
+    task = g.project.next_task(flask_login.current_user.get_id(), traingTask, batch_id)
 
     if task is None:
         # no tasks found
@@ -871,14 +1017,19 @@ def api_all_tasks():
     """
     # retrieve tasks (plus completions and predictions) with pagination & ordering
     if request.method == 'GET':
+        batchid = request.values.get('batchid', None)
         # get filter parameters from request
+        batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
+        if batch_id is None:
+            return make_response('', 404)
+
         fields = request.values.get('fields', 'all').split(',')
         page, page_size = int(request.values.get('page', 1)), int(request.values.get('page_size', 10))
         order = request.values.get('order', 'id')
         if page < 1 or page_size < 1:
             return make_response(jsonify({'detail': 'Incorrect page or page_size'}), 422)
 
-        params = SimpleNamespace(fields=fields, page=page, page_size=page_size, order=order)
+        params = SimpleNamespace(batchid=batch_id, fields=fields, page=page, page_size=page_size, order=order)
         tasks = prepare_tasks(g.project, params)
         return make_response(jsonify(tasks), 200)
 
@@ -894,6 +1045,7 @@ def api_all_tasks():
 def api_task_by_id(task_id):
     """ Get task by id, this call will refresh this task predictions
     """
+
     task_id = int(task_id)
 
     # try to get task with completions first
@@ -953,6 +1105,7 @@ def api_tasks_completions(task_id):
     task_id = int(task_id)
     user = flask_login.current_user.get_id()
     # save completion
+    batch_id = db.session.query(Task.batch_id).filter(Task.id==task_id).scalar()
     if request.method == 'POST':
         completion = request.json
 
@@ -963,11 +1116,11 @@ def api_tasks_completions(task_id):
         else:
             completion.pop('skipped', None)  # deprecated
             completion.pop('was_cancelled', None)
-            userScore = UserScore.query.filter_by(user_id=user, batch_id=0).first()
+            userScore = UserScore.query.filter_by(user_id=user, batch_id=batch_id).first()
             if userScore is not None:
                 userScore.score = userScore.score + 10
             else:
-                us = UserScore(user_id=user, batch_id=0, score=20, showDemo = False)
+                us = UserScore(user_id=user, batch_id=batch_id, score=20, showDemo = False)
                 userScore = us
 
             db.session.add(userScore)

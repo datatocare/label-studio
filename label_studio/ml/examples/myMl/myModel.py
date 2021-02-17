@@ -39,7 +39,7 @@ class SimpleTextClassifier(LabelStudioMLBase):
             for entity in doc.ents:
                 print(entity.text, entity.label_)
 
-                if entity.label_ in self.dictMap :
+                if entity.label_ in self.dictMap:
                     startIndex = sent.index(entity.text)
                     endIndex = startIndex + len(entity.text)
 

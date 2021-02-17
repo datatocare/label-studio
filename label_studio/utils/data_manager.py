@@ -24,7 +24,11 @@ def prepare_tasks(project, params):
     # cancelled_status = project.get_cancelled_status()
     #task_ids = project.source_storage.ids()
 
-    completed_at_data = db.session.query(Completion.task_id,Completion.data,Completion.completed_at).filter_by(user_id=flask_login.current_user.get_id()).all()
+    # completed_at_data = db.session.query(Completion.task_id,Completion.data,Completion.completed_at).filter_by(user_id=flask_login.current_user.get_id()).all()
+    completed_at_data = db.session.execute(
+        'select task_id,data,completed_at from completions where user_id = :userID and task_id in  (SELECT id FROM task WHERE batch_id = :batchid and format_type != 1)',
+        {'userID': flask_login.current_user.get_id(), 'batchid': params.batchid})
+
     completed_at = {}
     cancelled_status = {}
     pre_order = []

@@ -490,8 +490,10 @@
         loadTasks: function (polling) {
           var self = this;
           self.tasks_loaded = false;
-          this.getApi('tasks', 'api/tasks/' +
-            '?page=' + this.page +
+
+          this.getApi('tasks', 'api/tasks?batchid={% endraw %}{{ batchid }}{% raw %}' +
+
+            '&page=' + this.page +
             '&page_size=' + parseInt(this.page_size) +
             '&order=' + this.order +
             (polling ? '&polling=true': ''),

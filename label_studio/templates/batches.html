@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block body %}
+{% raw %}
+  <script src="static/js/polyfill.min.js"></script>
+  <script src="static/js/vue.js"></script>
+  <script src="static/js/lsf-sdk.js"></script>
+  <script src="static/js/mousetrap.min.js"></script>
+
+  <link rel="stylesheet" href="static/css/tasks.css">
+
+    <div class="ui task-container">
+
+      <div class="ui grid stackable" ref="grid">
+        <div class="column sixteen wide" id="left-panel">
+          <!-- Table -->
+          <div class="table-wrapper">
+            <table class="task-table center-margin">
+              <thead>
+
+              <!-- Header -->
+              <tr>
+                <th class="order">#</th>
+                <th class="order" >Name</th>
+                <th class="order" >Task Type</th>
+                <th class="order" >hexID</th>
+
+              </tr>
+
+              </thead>
+{% endraw %}
+
+              <tbody>
+              {% for batch in batches %}
+                  <tr >
+                      <td><a href= "/{{ batch.hexID }}">{{batch.id}}</a></td>
+                      <td><a href= "/{{ batch.hexID }}">{{batch.data}}</a></td>
+                      <td><a href= "/{{ batch.hexID }}">{{batch.Type}}</a></td>
+                      <td><a href= "/{{ batch.hexID }}">{{batch.hexID}}</a></td>
+
+                  </tr>
+                 {% endfor %}
+{% raw %}
+
+              </tbody>
+            </table>
+          </div>
+          <div class="ui divider hidden"></div>
+          <div class="mobile-divider"></div>
+        </div> <!-- left column -->
+
+    </div>
+
+
+  </div>
+
+
+{% endraw %}
+{% endblock %}

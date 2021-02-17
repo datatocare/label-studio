@@ -95,7 +95,7 @@ class Project(object):
 
         self.load_project_and_ml_backends()
         # self.update_derived_input_schema()
-        # self.update_derived_output_schema()
+        self.update_derived_output_schema()
 
         self.converter = None
         self.load_converter()
@@ -242,9 +242,9 @@ class Project(object):
         }
 
         # for all already completed tasks we update derived output schema for further label config validation
-        for task_id, c in self.target_storage.items():
-            for completion in c['completions']:
-                self._update_derived_output_schema(completion)
+        # for task_id, c in self.target_storage.items():
+        #     for completion in c['completions']:
+        #         self._update_derived_output_schema(completion)
         logger.debug('Derived output schema: ' + str(self.derived_output_schema))
 
     def add_ml_backend(self, params, raise_on_error=True):
@@ -462,7 +462,7 @@ class Project(object):
             for m in self.ml_backends:
                 m.clear(self)
 
-    def next_task(self, user, traingTask):
+    def next_task(self, user, traingTask, batchid):
         # completed_tasks_ids = set(completed_tasks_ids)
         sampling = self.config.get('sampling', 'sequential')
 
@@ -473,7 +473,7 @@ class Project(object):
             # task_id = next(task_iter, None)
             # if task_id is not None:
             #     return self.source_storage.get(task_id)
-            return self.source_storage.nextTask(user, traingTask)
+            return self.source_storage.nextTask(user, traingTask, batchid)
         # Tasks are sampled with equal probabilities
         elif sampling == 'uniform':
             actual_tasks_ids = list(task_iter)

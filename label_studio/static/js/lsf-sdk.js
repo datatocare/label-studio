@@ -112,7 +112,7 @@ const _loadTask = function(ls, url, reset,completionID) {
                     response.completionID = completionID
                     ls.resetState();
                     delete window.LSF_SDK;
-                    window.LSF_SDK = LSF_SDK("label-studio", response.layout, null, false, response.data.description, true, response);
+                    window.LSF_SDK = LSF_SDK("label-studio", response.layout, null, false, response.data.description, true, response, response.data.batch_id);
                     // ls = window.LSF_SDK;
                     if (window.LSF_SDK.task && window.LSF_SDK.task.dataObj.format_type == 1 ) {
                         var Skipbtn = $('.ls-skip-btn').children().first();
@@ -177,8 +177,8 @@ const _loadTask = function(ls, url, reset,completionID) {
     }
 };
 
-const loadNext = function(ls, rest, trainingTask) {
-  var url = `${API_URL.MAIN}${API_URL.PROJECT}${API_URL.NEXT}${API_URL.TraingTask}${trainingTask}`;
+const loadNext = function(ls, rest, trainingTask, batchid) {
+  var url = `${API_URL.MAIN}${API_URL.PROJECT}${API_URL.NEXT}/${batchid}${API_URL.TraingTask}${trainingTask}`;
   return _loadTask(ls, url, rest);
 };
 
@@ -214,10 +214,10 @@ const _convertTask = function(task) {
 };
 
 
-const LSF_SDK = function(elid, config, task, hide_skip, description, reset, response) {
+const LSF_SDK = function(elid, config, task, hide_skip, description, reset, response, batchid) {
 
   const showHistory = task === null;  // show history buttons only if label stream mode, not for task explorer
-
+  const batch_id = batchid;
   const _prepData = function(c, includeId) {
     var completion = {
       lead_time: (new Date() - c.loadedDate) / 1000,  // task execution time
@@ -302,7 +302,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
           if (task) {
             ls.setFlags({ isLoading: false });
           } else {
-            loadNext(ls, true, 0);
+            loadNext(ls, true, 0, batch_id);
           }
         });
       });
@@ -384,9 +384,9 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
             // loadTask(ls, ls.task.id, res.id);
           // } else {
             if (ls.task.dataObj.format_type == 1) {
-                loadNext(ls,true, 1);
+                loadNext(ls,true, 1, batch_id);
             } else {
-                loadNext(ls, true, 0);
+                loadNext(ls, true, 0, batch_id);
             }
           // }
         })
@@ -410,7 +410,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
       if (reset == false) {
           if (!task) {
               ls.setFlags({isLoading: true});
-              loadNext(ls, false, 0);
+              loadNext(ls, false, 0, batch_id);
           // }
           } else {
             if (!task.completions || task.completions.length === 0) {
@@ -467,7 +467,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
             loadTask(LS, prev.task_id, prev.completion_id);
           }
           else {
-            loadNext(LS, true, 0);  // new task
+            loadNext(LS, true, 0, batchid);  // new task
           }
       }
   };
