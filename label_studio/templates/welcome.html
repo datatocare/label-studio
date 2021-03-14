@@ -167,5 +167,127 @@
     </center>
   </div>
   <br>
+    <button class="myclass" id="myId" onclick="myFunction()">Bilal Click Me</button>
+    <button class="myclass1" id="myId2" onclick="myFunction()">Bilal Click Me2</button>
+<script>
+function myFunction() {
+  alert("Hello! I am an alert box!");
+}
+</script>
+{#<script src="https://shepherdjs.dev/dist/js/shepherd.min.js"></script>#}
+{##}
+{#    <script>#}
+{#            const tour = new Shepherd.Tour({#}
+{#          defaultStepOptions: {#}
+{#            cancelIcon: {#}
+{#              enabled: true#}
+{#            },#}
+{#            classes: 'class-1 class-2',#}
+{#            scrollTo: { behavior: 'smooth', block: 'center' }#}
+{#          }#}
+{#        });#}
+{##}
+{#            tour.addStep({#}
+{#              title: 'Creating a Shepherd Tour',#}
+{#              text: `Creating a Shepherd tour is easy. too!\#}
+{#              Just create a \`Tour\` instance, and add as many steps as you want.`,#}
+{#              attachTo: {#}
+{#                element: '.myclass',#}
+{#                on: 'bottom'#}
+{#              },#}
+{#              buttons: [#}
+{#                {#}
+{#                  action() {#}
+{#                    return this.back();#}
+{#                  },#}
+{#                  classes: 'shepherd-button-secondary',#}
+{#                  text: 'Back'#}
+{#                },#}
+{#                {#}
+{#                  action() {#}
+{#                    return this.next();#}
+{#                  },#}
+{#                  text: 'Next'#}
+{#                }#}
+{#              ],#}
+{#              id: 'creating'#}
+{#            });#}
+{##}
+{#            tour.addStep({#}
+{#              title: 'Creating a Shepherd Tour',#}
+{#              text: `Creating a Shepherd tour is easy. too!\#}
+{#              Just create a \`Tour\` instance, and add as many steps as you want.`,#}
+{#              attachTo: {#}
+{#                element: '.myclass1',#}
+{#                on: 'bottom'#}
+{#              },#}
+{#              buttons: [#}
+{#                {#}
+{#                  action() {#}
+{#                    return this.back();#}
+{#                  },#}
+{#                  classes: 'shepherd-button-secondary',#}
+{#                  text: 'Back'#}
+{#                },#}
+{#                {#}
+{#                  action() {#}
+{#                    return this.next();#}
+{#                  },#}
+{#                  text: 'Next'#}
+{#                }#}
+{#              ],#}
+{#              id: 'creating'#}
+{#            });#}
+{##}
+{#            tour.start();#}
+{#    </script>#}
+<script src="../static/js/setup.js"></script>
+    <script>
+            {#p = $($(".ant-tag")[1]);#}
+            {#p.attr('id', "myId");#}
+            {#p1 = $($(".ant-tag")[0]);#}
+            {#p1.attr('id', "myId2")#}
+            var steps = [
+                {
+                    elementId: 'myId',
+                    title: 'Step 1',
+                    description: 'You need to click on that div to go to the next step',
+                    triggerNext: ['change', 'keydown']
+                },{
+                    elementId: 'myId2',
+                    title: 'Step 2',
+                    description: 'You need to click on that div to go to the next step',
+                    triggerNext: 'click'
+                }
+            ];
+            var options = {
+            duration: 2000};
+            myTour = new StepsJs(steps, options);
+            {#myTour.run();#}
 
+    </script>
+
+{#    <script src="https://unpkg.com/intro.js/minified/intro.min.js"  ></script>#}
+{#<script>#}
+{#        w = document.getElementsByClassName("myclass")[0];#}
+{#        var q = introJs().setOptions({#}
+{#            // showButtons: false,#}
+{#            showBullets: false,#}
+{#            // showStepNumbers: false,#}
+{#            // overlayOpacity: 0.1,#}
+{#            // disableInteraction: true,#}
+{#            steps: [#}
+{#                {#}
+{#                    title: 'Welcome',#}
+{#                    intro: 'Hello World! 👋'#}
+{#                },{#}
+{#                    title: 'Select Tag',#}
+{#                    element: w,#}
+{#                    intro: "Select Tag",#}
+{#                    position: 'top'#}
+{#                }#}
+{#            ]#}
+{#        });#}
+{#        q.start();#}
+{#</script>#}
 {% endblock %}

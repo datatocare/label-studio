@@ -167,7 +167,7 @@ const _loadTask = function(ls, url, reset,completionID) {
                 cs.selected.setupHotKeys();
 
                 ls.setFlags({ isLoading: false });
-
+      // alert("Bilal 0");
                 ls.onTaskLoad(ls, ls.task);
               }
             })
@@ -301,6 +301,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
           if (task) {
             ls.setFlags({ isLoading: false });
+                  // alert("Bilal 4");
           } else {
             loadNext(ls, true, 0, batch_id);
           }
@@ -337,6 +338,176 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
                      'Next <i class="ui icon fa-angle-right"></i></button>');
         firstBlock.after(block);
       }
+        // alert(document.querySelector('[class^="ant-tag"]'));
+      //   tags = document.getElementsByClassName('ant-tag');
+      // bts = document.getElementsByClassName("ant-btn ");
+      //   // textArea = document.querySelector('[class^="Text_block"]');
+      //   labelbtns = document.getElementsByClassName('ls-entity-buttons')[0];
+      //   $($(".ant-tag")[0]).wrap("<div class='myclass1' style='width: 150px; height: 50px; padding: 15px'></div>");
+      //   var q = introJs().setOptions({
+      //       // showButtons: false,
+      //       showBullets: false,
+      //       // showStepNumbers: false,
+      //       // overlayOpacity: 0.1,
+      //       disableInteraction: false,
+      //       steps: [
+      //           {
+      //               title: 'Welcome',
+      //               intro: 'Hello World! 👋'
+      //           },{
+      //               title: 'Select Tag',
+      //               element: document.getElementsByClassName('myclass1')[0],
+      //               intro: "Select Tag",
+      //               position: 'top'
+      //           }
+      //       ]
+      //   });
+      //   q.start();
+
+        ///////////////////////    Image Intro ///////////////////
+        // setTimeout(function() {
+        // tags[0].click();
+        // textArea = document.getElementsByTagName("canvas");
+        // textArea = document.getElementsByClassName('ImageView_container__AOBmH');
+        // const rect = textArea[0].getBoundingClientRect();
+        //
+        // _left = rect.x + window.scrollX;
+        // _top = Math.floor(rect.y) + window.scrollY;
+        // //
+        // console.log(_left);
+        // console.log(_top);
+        //
+        // qwe = document.elementFromPoint(_left, _top);
+        // var evt = document.createEvent("MouseEvents");
+        // evt.initEvent("mousedown", true, true, document.defaultView, 0, 0, 0, _left, _top);
+        // qwe.dispatchEvent(evt);
+        // //
+        // var evt = document.createEvent("MouseEvents");
+        // evt.initEvent("mouseup", true, true, document.defaultView, 0, 0, 0, _left, _top);
+        // qwe.dispatchEvent(evt);
+        // //
+        // var evt = document.createEvent("MouseEvents");
+        // evt.initEvent("click", true, true, document.defaultView, 0, 0, 0, _left, _top);
+        // qwe.dispatchEvent(evt);
+        //
+        // qwe = document.elementFromPoint(468, 448);
+        // var evt = document.createEvent("MouseEvents");
+        // evt.initEvent("mousedown", true, true);
+        // qwe.dispatchEvent(evt);
+        //
+        // var evt = document.createEvent("MouseEvents");
+        // evt.initEvent("mouseup", true, false);
+        // qwe.dispatchEvent(evt);
+        //
+        // var evt = document.createEvent("MouseEvents");
+        // evt.initEvent("click", true, false);
+        // qwe.dispatchEvent(evt);
+        // },(3*1000));
+
+
+        ///////////////////////////        Automated intro for text labeling and relation      ////////////////////////
+        // var waitTime = 1;
+        // elemenq = document.querySelector('[class^="Text_line"]');
+        // setTimeout(function(){
+        //     q.nextStep();
+        //     setTimeout(function(){
+        //         tags[0].click();
+        //         setTimeout(function(){
+        //             q.nextStep();
+        //             setTimeout(function(){
+        //                 let range = new Range();
+        //                 range.setStart(elemenq.firstChild, 5);
+        //                 range.setEnd(elemenq.firstChild, 10)
+        //                 window.getSelection().removeAllRanges();
+        //                 window.getSelection().addRange(range);
+        //                 var evt = document.createEvent("MouseEvents");
+        //                 evt.initEvent("mouseup", true, true);
+        //                 elemenq.dispatchEvent(evt);
+        //                 setTimeout(function(){
+        //                     labelbtns = document.getElementsByClassName('ls-entity-buttons')[0];
+        //                     q.addStep({title: 'Action Buttons', element: labelbtns, intro: 'Create Relation, Add meta info, UnSelect or Delete Tag', position: 'top'});
+        //                     q.refresh();
+        //                     lastElementIndex = q._options.steps.length - 1;
+        //                     q._introItems.push(q._options.steps[lastElementIndex]);
+        //                     q._introItems[lastElementIndex].step = lastElementIndex + 1;
+        //                     q._introItems[lastElementIndex].disableInteraction = true;
+        //                     q.nextStep();
+        //                     setTimeout(function(){
+        //                         b1 = labelbtns.children[2];
+        //                         q.addStep({title: 'Unselect', intro: "Unselect for next ", element: b1, position: 'top'});
+        //                         lastElementIndex = q._options.steps.length - 1;
+        //                         q._introItems.push(q._options.steps[lastElementIndex]);
+        //                         q._introItems[lastElementIndex].step = lastElementIndex + 1;
+        //                         q._introItems[lastElementIndex].disableInteraction = true;
+        //                         q.nextStep();
+        //                         setTimeout(function(){
+        //                             b1.click();
+        //                             q.addStep({title: 'Select Tag', intro: "Select 2nd Tag", element: tags[3], position: 'top'});
+        //                             lastElementIndex = q._options.steps.length - 1;
+        //                             q._introItems.push(q._options.steps[lastElementIndex]);
+        //                             q._introItems[lastElementIndex].step = lastElementIndex + 1;
+        //                             q._introItems[lastElementIndex].disableInteraction = true;
+        //                             q.nextStep();
+        //                             setTimeout(function(){
+        //                                 tags[3].click();
+        //                                 q.addStep({title: 'Highlight Text!', element: textArea, intro: 'Select Text with mouse!', position: 'top'});
+        //                                 lastElementIndex = q._options.steps.length - 1;
+        //                                 q._introItems.push(q._options.steps[lastElementIndex]);
+        //                                 q._introItems[lastElementIndex].step = lastElementIndex + 1;
+        //                                 q._introItems[lastElementIndex].disableInteraction = true;
+        //                                 q.nextStep();
+        //                                 setTimeout(function(){
+        //                                     let range = new Range();
+        //                                     range.setStart(elemenq.lastChild, elemenq.lastChild.textContent.indexOf("China"));
+        //                                     range.setEnd(elemenq.lastChild, elemenq.lastChild.textContent.indexOf("China") + 2)
+        //                                     window.getSelection().removeAllRanges();
+        //                                     window.getSelection().addRange(range);
+        //                                     var evt = document.createEvent("MouseEvents");
+        //                                     evt.initEvent("mouseup", true, true);
+        //                                     elemenq.dispatchEvent(evt);
+        //                                     setTimeout(function(){
+        //                                         // q.exit();
+        //                                         labelbtns1 = document.getElementsByClassName('ls-entity-buttons')[0];
+        //                                         b2 = labelbtns1.children[0];
+        //                                         q.addStep({title: 'Relations', element: b2, intro: 'Click to start relation process', position: 'top'});
+        //                                         lastElementIndex = q._options.steps.length - 1;
+        //                                         q._introItems.push(q._options.steps[lastElementIndex]);
+        //                                         q._introItems[lastElementIndex].step = lastElementIndex + 1;
+        //                                         q._introItems[lastElementIndex].disableInteraction = true;
+        //                                         q.nextStep();
+        //                                         setTimeout(function(){
+        //                                             b2.click();
+        //                                             rlspan = document.querySelector('[data-labels^="Person"]');
+        //                                             q.addStep({title: 'Relations', element: rlspan, intro: 'Click to create Relation!', position: 'top'});
+        //                                             lastElementIndex = q._options.steps.length - 1;
+        //                                             q._introItems.push(q._options.steps[lastElementIndex]);
+        //                                             q._introItems[lastElementIndex].step = lastElementIndex + 1;
+        //                                             q._introItems[lastElementIndex].disableInteraction = true;
+        //                                             q.nextStep();
+        //                                             setTimeout(function(){
+        //                                                 q.exit();
+        //                                                 var evt = document.createEvent("MouseEvents");
+        //                                                 evt.initEvent("mouseover", true, true);
+        //                                                 rlspan.dispatchEvent(evt);
+        //                                                 var evt = document.createEvent("MouseEvents");
+        //                                                 evt.initEvent("mousedown", true, true);
+        //                                                 rlspan.dispatchEvent(evt);
+        //                                                 var evt = document.createEvent("MouseEvents");
+        //                                                 evt.initEvent("click", true, false);
+        //                                                 rlspan.dispatchEvent(evt);
+        //                                             },(waitTime*1000));
+        //                                         },(waitTime*1000));
+        //                                     },(waitTime*1000));
+        //                                 },(waitTime*1000));
+        //                             },(waitTime*1000));
+        //                         },(waitTime*1000));
+        //                     },(waitTime*1000));
+        //                 },(waitTime*1000));
+        //             },(waitTime*1000));
+        //         },(waitTime*1000));
+        //     },(waitTime*1000));
+        // },(waitTime*1000));
+
     },
 
     onUpdateCompletion: function(ls, c) {
@@ -422,7 +593,6 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
             // }
           }
       } else {
-
         response.data = JSON.stringify(response.data);
         ls.setFlags({isLoading: false});
         ls.resetState();
@@ -448,6 +618,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
         if (c.id) cs.selectCompletion(c.id);
            ls.onTaskLoad(ls, ls.task);
       }
+      // alert("Bilal 3");
     }
   });
 
