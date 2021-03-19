@@ -15,6 +15,9 @@ const API_URL = {
   INSTRUCTION: "/project?fields=instruction"
 };
 
+var TempTaskData;
+var tmpLS;
+
 const Requests = (function(window) {
   const handleResponse = res => {
     if (res.status !== 200 || res.status !== 201) {
@@ -87,7 +90,7 @@ const Requests = (function(window) {
   };
 })(window);
 
-const _loadTask = function(ls, url, reset,completionID) {
+const _loadTask = function(ls, url, completionID, reset) {
     try {
         const req = Requests.fetcher(url);
 
@@ -108,35 +111,25 @@ const _loadTask = function(ls, url, reset,completionID) {
                  */
                 // ls = LSF_SDK("label-studio", response.label_config_line, null);
                 // ls.LS.config(response.label_config_line)
-                if (reset == true) {
-                    response.completionID = completionID
-                    ls.resetState();
-                    delete window.LSF_SDK;
-                    window.LSF_SDK = LSF_SDK("label-studio", response.layout, null, false, response.data.description, true, response, response.data.batch_id);
-                    // ls = window.LSF_SDK;
-                    if (window.LSF_SDK.task && window.LSF_SDK.task.dataObj.format_type == 1 ) {
-                        var Skipbtn = $('.ls-skip-btn').children().first();
-                        Skipbtn.html('').append ("<span>Show me More </span>");
-                        var Updatebtn = $('.ls-update-btn').children().first().next();
-                        Updatebtn.html('').append ("<span>Got it </span>");
-
-                        var Submitbtn = $('.ls-submit-btn').children().first().next();
-                        Submitbtn.html('').append ("<span>Got it </span>");
-                    }
-
-                }
-                else {
+                // if (reset == true) {
+                //     response.completionID = completionID
+                //     ls.resetState();
+                //     delete window.LSF_SDK;
+                //     window.LSF_SDK = LSF_SDK("label-studio", response.layout, null, false, response.data.description, true, response, response.data.batch_id, 1);
+                //     // ls = window.LSF_SDK;
+                //    MyDOList(window.LSF_SDK, window.LSF_SDK.task);
+                // }
+                // else {
                     /**
                      * Add new data from received task
                      */
                 response.data = JSON.stringify(response.data);
+                TempTaskData = response;
+                tmpLS = ls;
                 ls.resetState();
                 ls.assignTask(response);
                 ls.initializeStore(_convertTask(response));
                 ls.updateDescription(response.description);
-                // if (response.format_type == 3) {
-                //     ls.toggleDescription();
-                // }
                 let cs = ls.completionStore;
                 let c;
 
@@ -153,7 +146,7 @@ const _loadTask = function(ls, url, reset,completionID) {
                     c = {id: 1};
                 }
 
-                else if (ls.completionStore.completions.length > 0 && response.format_type == 1) {
+                else if (ls.completionStore.completions.length > 0 && (response.format_type == 1) ) {
                     c = {id: completionID};
                 }
 
@@ -165,26 +158,98 @@ const _loadTask = function(ls, url, reset,completionID) {
 
                 // fix for broken old references in mst
                 cs.selected.setupHotKeys();
-
                 ls.setFlags({ isLoading: false });
-      // alert("Bilal 0");
                 ls.onTaskLoad(ls, ls.task);
-              }
+                MyDOList(ls, ls.task);
+              // }
             })
         });
     } catch (err) {
         console.error("Failed to load next task ", err);
     }
 };
+function MyDOList(ls, task){
+      if (task && task.dataObj.format_type == 1 ) {
+          if (task.dataObj.completions != null){
+              var Skipbtn = $('.ls-skip-btn').children().first();
+              Skipbtn.html('').append("<span>Got It </span>");
+              // $('.ls-skip-btn').hide();
+              Skipbtn.on('click', function () {
+                  c = ls.completionStore.addCompletion({userGenerate: true});
+                  cs.selectCompletion(c.id);
+              });
+              $('.ls-update-btn').hide();
+              $('.ls-submit-btn').hide();
+         }
 
-const loadNext = function(ls, rest, trainingTask, batchid) {
+            // var Updatebtn = $('.ls-update-btn').children().first().next();
+            // Updatebtn.html('').append ("<span>Got it </span>");
+            // var Submitbtn = $('.ls-submit-btn').children().first().next();
+            // Submitbtn.html('').append ("<span>Got it </span>");
+
+        } else if (task && task.dataObj.format_type == 2) {
+            setTimeout(function () {
+                startIntroForRE(task.dataObj.completions[0].result, tmpLS);
+            }, (1 * 1000));
+        } else if (task && task.dataObj.format_type == 3) {
+            btndiv = $(".Controls_container__LTeAA")[0];
+            var btn = $('<button type="button" class="ant-btn ant-btn-ghost helpBtn"><span>Help Me Understand</span></button>');
+            btndiv.append(btn[0]);
+            $(".helpBtn").on('click', function(){
+                tmpLS = ls;
+                reRenderTask(tmpLS, TempTaskData);
+            });
+        }
+}
+function reRenderTask(ls, response, completionID){
+    // ls.resetState();
+    // ls.assignTask(response);
+    // ls.initializeStore(_convertTask(response));
+    // ls.updateDescription(response.description);
+    let cs = ls.completionStore;
+    let c;
+
+    // if (ls.completionStore.completions.length > 0 && completionID === 'auto') {
+      c = {id: ls.completionStore.completions[0].id, editable: false};
+    // }
+    //
+    // else if (cs.predictions.length > 0) {
+    //     c = ls.completionStore.addCompletionFromPrediction(cs.predictions[0]);
+    // }
+    //
+    // // we are on history item, take completion id from history
+    // else if (ls.completionStore.completions.length > 0 && completionID) {
+    //     c = {id: 1};
+    // }
+    //
+    // else {
+    //     c = {id: completionID, editable: false};
+    // }
+
+    if (c.id) cs.selectCompletion(c.id);
+
+    // fix for broken old references in mst
+    cs.selected.setupHotKeys();
+    ls.setFlags({ isLoading: false });
+    var Skipbtn = $('.ls-skip-btn').children().first();
+    Skipbtn.html('').append ("<span>Next </span>");
+    Skipbtn.on('click', function(){
+        c = ls.completionStore.addCompletion({ userGenerate: true });
+        cs.selectCompletion(c.id);
+        // ls.onSkipTask(ls);
+    });
+    $('.ls-update-btn').hide();
+    $('.ls-submit-btn').hide();
+}
+
+const loadNext = function(ls, reset, trainingTask, batchid) {
   var url = `${API_URL.MAIN}${API_URL.PROJECT}${API_URL.NEXT}/${batchid}${API_URL.TraingTask}${trainingTask}`;
-  return _loadTask(ls, url, rest);
+  return _loadTask(ls, url, "", reset);
 };
 
-const loadTask = function(ls, taskID, completionID,reset=false) {
+const loadTask = function(ls, taskID, completionID, reset=false) {
   var url = `${API_URL.MAIN}${API_URL.TASKS}/${taskID}/`;
-  return _loadTask(ls, url,reset, completionID);
+  return _loadTask(ls, url, completionID, reset);
 };
 
 const _convertTask = function(task) {
@@ -214,7 +279,7 @@ const _convertTask = function(task) {
 };
 
 
-const LSF_SDK = function(elid, config, task, hide_skip, description, reset, response, batchid) {
+const LSF_SDK = function(elid, config, task, hide_skip, description, reset, response, batchid, numofPanel) {
 
   const showHistory = task === null;  // show history buttons only if label stream mode, not for task explorer
   const batch_id = batchid;
@@ -243,35 +308,41 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
   var interfaces = [
       "basic",
-      "panel", // undo, redo, reset panel
-      "controls", // all control buttons: skip, submit, update
-      "submit", // submit button on controls
-      "update", // update button on controls
-          // "predictions",
-         // "predictions:menu", // right menu with prediction items
-         "completions:menu", // right menu with completion items
-         // "completions:add-new",
-         // "completions:delete",
-          "side-column", // entity
-          "skip",
-           "leaderboad",
-           "messages",
+      // "panel", // undo, redo, reset panel
+      // "controls", // all control buttons: skip, submit, update
+      // "submit", // submit button on controls
+      // "update", // update button on controls
+      //     "predictions",
+      //    "predictions:menu", // right menu with prediction items
+      //    "completions:menu", // right menu with completion items
+      //    "completions:add-new",
+      //    "completions:delete",
+      //     "side-column", // entity
+      //     "skip",
+      //      "leaderboad",
+      //      "messages",
   ];
   if (!hide_skip) {
     interfaces.push('skip');
   }
 
-  // if (task != null && task.type == 3) {
-  //     interfaces.push("predictions");
-  //    interfaces.push("predictions:menu"); // right menu with prediction items
-  //    interfaces.push("completions:menu"); // right menu with completion items
-  //    interfaces.push("completions:add-new");
-  //    interfaces.push("completions:delete");
-  //    interfaces.push("side-column"); // entity
-  //    interfaces.push("skip");
-  //    interfaces.push("leaderboad");
-  //    interfaces.push("messages");
-  // }
+  if (numofPanel == 1) {
+     interfaces.push("panel"); // undo, redo, reset panel
+     interfaces.push("controls"); // all control buttons: skip, submit, update
+     interfaces.push("submit"); // submit button on controls
+     interfaces.push("update"); // update button on controls
+
+      // interfaces.push("predictions");
+     // interfaces.push("predictions:menu"); // right menu with prediction items
+     interfaces.push("completions:menu"); // right menu with completion items
+     // interfaces.push("completions:menu"); // right menu with completion items
+     // interfaces.push("completions:add-new");
+     // interfaces.push("completions:delete");
+     interfaces.push("side-column"); // entity
+     interfaces.push("skip");
+     interfaces.push("leaderboad");
+     interfaces.push("messages");
+  }
 
   var LS = new LabelStudio(elid, {
     config: config,
@@ -313,15 +384,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
     onTaskLoad: function(ls, task) {
       // render back & next buttons if there are history
-        if (task && task.dataObj.format_type == 1 ) {
-            var Skipbtn = $('.ls-skip-btn').children().first();
-            Skipbtn.html('').append ("<span>Show me More </span>");
-            var Updatebtn = $('.ls-update-btn').children().first().next();
-            Updatebtn.html('').append ("<span>Got it </span>");
 
-            var Submitbtn = $('.ls-submit-btn').children().first().next();
-            Submitbtn.html('').append ("<span>Got it </span>");
-        }
       if (showHistory && ls.taskHistoryIds && ls.taskHistoryIds.length > 0) {
         var firstBlock = $('[class^=Panel_container]').children().first();
         var className = firstBlock.attr('class');

@@ -180,6 +180,8 @@ class UserScore(db.Model):
     batch_id = db.Column(db.Integer)
     score = db.Column(db.Float)
     showDemo = db.Column(db.Boolean, default=True)
+    current_task_type = db.Column(db.Integer)
+
 
 class TrainingTask(db.Model):
     __tablename__ = 'TrainingTask'
@@ -236,4 +238,21 @@ class BatchData(db.Model):
         nullable=False,
     )
 
+class TrainingTaskCompletions(db.Model):
+    __tablename__ = 'TrainingTaskCompletions'
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    task_id = db.Column(db.Integer, db.ForeignKey('TrainingTask.id'), nullable=False)
+    data = db.Column(
+        db.String(2000),
+        nullable=False,
+        unique=False
+    )
+
+    completed_at = db.Column(
+        db.BigInteger
+    )
 

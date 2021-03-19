@@ -5,6 +5,7 @@ from label_studio.models import Task, Completion, OldCompletion, UserScore, Trai
 from label_studio import db
 from label_studio.utils.io import json_load
 from sqlalchemy import func
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +33,14 @@ def checkAndgetTrainginTask(userID, batchid):
         db.session.commit()
     # nextTask = db.session.query(Task).filter(Task.batch_id==batchid, Task.format_type == 1, Task.id.notin_(Taskidcompleted)).first()
     nextTask = db.session.execute(
-        'SELECT * FROM Task WHERE batch_id=:batchid and Task.format_type == 1 and '
+        'SELECT * FROM TrainingTask WHERE batch_id=:batchid and TrainingTask.format_type == 1 and '
         'id not in (select task_id from completions where user_id = :userID and '
-        'task_id in (select id from Task where batch_id= :batchid and Task.format_type == 1) ) order by id',
+        'task_id in (select id from TrainingTask where batch_id= :batchid and TrainingTask.format_type == 1) ) order by id',
         {'userID': userID,'batchid':batchid }).first()
+    # nextTask = db.session.execute(
+    #     'SELECT * FROM TrainingTask WHERE batch_id=:batchid and format_type == 1 ',
+    #     {'userID': userID, 'batchid': batchid}).first()
+
     return nextTask
 
 
@@ -137,28 +142,33 @@ class JsonDBStorage(BaseStorage):
         return
         # return self.data.items()
 
-    def nextTask(self, userID, traingTask, batchid):
+    # def nextTask(self, userID, traingTask, batchid):
+    def nextTask(self, userID, taskType, batchid):
         # db.session.query()
-        nextTask = tuple
+        nextTask = None
         # showDemo = 0
 
-        userDemoFlag = UserScore.query.filter_by(user_id=userID, batch_id=batchid).first()
-        if userDemoFlag == None or userDemoFlag.showDemo == True or traingTask == '1':
-            nextTask = checkAndgetTrainginTask(userID, batchid)
+        # userDemoFlag = UserScore.query.filter_by(user_id=userID, batch_id=batchid).first()
+        # if userDemoFlag == None or userDemoFlag.showDemo == True or traingTask == '1':
+        #     nextTask = checkAndgetTrainginTask(userID, batchid)
             # nextTask = db.session.execute(
             #     'SELECT * FROM TrainingTask WHERE id not in (select task_id from completions where user_id = :userID ) order by id',
             #       {'userID': userID}).first()
             # showDemo = 1
-        else:
+        # else:
             # print("Here 5")
             # print("Here 1")
             # print(userScore)
             # if userScore < 20:
             #     nextTask = checkAndgetTrainginTask(userID)
             # else:
-            nextTask = db.session.execute(
-                'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid  order by id',
-                {'userID': userID, 'batchid': batchid}).first()
+            # nextTask = db.session.execute(
+            #     'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid  order by id',
+            #     {'userID': userID, 'batchid': batchid}).first()
+            # nextTask = db.session.execute(
+            #     'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) ' +
+            #     'and batch_id = :batchid  order by id',
+            #     {'userID': userID, 'batchid': batchid}).first()
 
         # logger.debug(nextTask)
         # logger.debug(type(nextTask))
@@ -167,9 +177,41 @@ class JsonDBStorage(BaseStorage):
             # print(r['my_column'])  # Access by column name as a string
             # r_dict = dict(r.items())  # convert to dict keyed by column names
             #  return r.__dict_
+        if taskType in (1, 2, 3, 4):
+            nextTask = db.session.execute(
+                'SELECT * FROM task WHERE id in (select task_id from completions where user_id != :userID ) and id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
+                {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
+            if nextTask is None:
+                nextTask = db.session.execute(
+                       'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
+                    {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
+        elif taskType in (5, 6) :
+            nextTask = db.session.execute(
+                'SELECT * FROM task WHERE id NOT in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1',
+                {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
+
+        # TODO : Check if completion is empty the re elect task
+
         if nextTask is None:
             return None
         dictTask = dict(nextTask.items())
+        completed_at_data = db.session.execute(
+            'select id,task_id,data,completed_at from completions where task_id = :id',
+            {'id': nextTask.id}).first()
+
+        if completed_at_data is not None:
+            completionData = json.loads(completed_at_data.data)
+            completionData['id'] = completed_at_data.id
+            # logger.debug(json.dumps(completionData, indent=2))
+            dictTask["completions"] = [completionData]  # [json.loads(completion.data)]
+            dictTask['completed_at'] = completed_at_data.completed_at
+
+        # if 'result' in dictTask:
+        #     completionData = json.loads(dictTask['result'])
+        #     completionData['id'] = completionData['id']
+        #     # logger.debug(json.dumps(completionData, indent=2))
+        #     dictTask["completions"] = [completionData]  # [json.loads(completion.data)]
+        #     # dictTask['completed_at'] = completionData['completed_at']
         # dictTask["showDemo"] = showDemo
         return dictTask
 

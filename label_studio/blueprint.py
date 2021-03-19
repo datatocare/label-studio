@@ -258,6 +258,12 @@ def labeling_page(batchid = '0'):
         task_id = request.args.get('task_id', None)
         user_id = flask_login.current_user.get_id()
 
+        userScore = UserScore.query.filter_by(user_id=user_id, batch_id=batch_id).first()
+        if userScore is None:
+            us = UserScore(user_id=user_id, batch_id=batch_id, score=20, showDemo=False, current_task_type=1)
+            db.session.add(us)
+            db.session.commit()
+
         if task_id is not None:
             task_id = int(task_id)
             # Task explore mode
@@ -267,7 +273,7 @@ def labeling_page(batchid = '0'):
             if g.project.ml_backends_connected:
                 task_data = g.project.make_predictions(task_data)
         else:
-            task = g.project.next_task(user_id, '0', batch_id)
+            task = g.project.next_task(user_id, 1, batch_id)
             if task is not None:
                 # no tasks found
                 Newtask = {}
@@ -283,6 +289,10 @@ def labeling_page(batchid = '0'):
                 ar["message"] = "Give your Answer"
                 task["taskAnswerResponse"] = ar
                 task["format_type"] = Newtask['data']['format_type']
+                if 'completions' in Newtask['data']:
+                    task["completions"] = Newtask['data']['completions']
+
+
                 # if "result" in task["data"]:
                 # completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(), task_id=task_id).first()
                 # if completion is not None:
@@ -880,11 +890,13 @@ def api_generate_next_task(batchid):
     # if batchid == '0':
     #     return make_response('', 404)
     # print(batchid)
+    userId = flask_login.current_user.get_id()
     batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
     if batch_id is None:
         return make_response('', 404)
-    traingTask = request.values.get('traingTask', False)
-    task = g.project.next_task(flask_login.current_user.get_id(), traingTask, batch_id)
+    # traingTask = request.values.get('traingTask', False)
+    taskType = db.session.query(UserScore.current_task_type).filter(UserScore.user_id == userId).scalar()
+    task = g.project.next_task(userId, taskType, batch_id)
 
     if task is None:
         # no tasks found
@@ -897,6 +909,9 @@ def api_generate_next_task(batchid):
     Newtask['description'] = task['description']
     task = Newtask
     task["format_type"] = Newtask['data']['format_type']
+    if 'completions' in Newtask['data']:
+        task["completions"] = Newtask['data']['completions']
+
     # if "result" in task["data"]:
         # completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(), task_id=task_id).first()
         # if completion is not None:
