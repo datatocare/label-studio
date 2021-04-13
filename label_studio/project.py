@@ -610,7 +610,7 @@ class Project(object):
             data['predictions'] = self.source_storage.get(task_id).get('predictions', [])
         return data
 
-    def save_completion_in_DB(self, task_id, completion):
+    def save_completion_in_DB(self, task_id, completion, batch_id, was_skipped):
         """ Save completion
 
         :param task_id: task id
@@ -628,11 +628,17 @@ class Project(object):
                         # completion // update time lead time add current lead time
                         dbCompletion.data = json.dumps(completion)
                         dbCompletion.completed_at = timestamp_now()
+                        dbCompletion.batch_id = batch_id
+                        if was_skipped == "1":
+                            dbCompletion.was_skipped = True
+                        else:
+                            dbCompletion.was_skipped = False
+                        # dbCompletion.was_skipped = was_skipped
                         # dbCompletion.lea
                         db.session.add(dbCompletion)
                         db.session.commit()
                         logger.debug(
-                            'Completion ' + str(task_id) + ' updated:\n' + json.dumps(dbCompletion.__dict__, indent=2))
+                            'Completion ' + str(task_id) + ' updated:\n' + json.dumps(str(dbCompletion), indent=2))
                         return dbCompletion.id
                 else:
                     completion['created_at'] = timestamp_now()
@@ -640,7 +646,10 @@ class Project(object):
                     # _taks_id = task.id
                     # _data = json(completion)
                     # logger.debug(type(completion))
-                    dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=json.dumps(completion),completed_at=completion['created_at'])#,hexID=completion["result"][0]['id']
+                    _was_skipped = False
+                    if was_skipped == "1":
+                        was_skipped = True
+                    dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=json.dumps(completion),completed_at=completion['created_at'], batch_id=batch_id, was_skipped=was_skipped)#,hexID=completion["result"][0]['id']
                     db.session.add(dbCompletion)
                     db.session.commit()
                     # _dbCompletion = dbCompletion.__dict__

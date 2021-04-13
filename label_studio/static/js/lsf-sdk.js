@@ -15,8 +15,9 @@ const API_URL = {
   INSTRUCTION: "/project?fields=instruction"
 };
 
-var TempTaskData;
+var lastId;
 var tmpLS;
+var isAdmin;
 
 const Requests = (function(window) {
   const handleResponse = res => {
@@ -123,6 +124,7 @@ const _loadTask = function(ls, url, completionID, reset) {
                     /**
                      * Add new data from received task
                      */
+                console.log(response);;
                 response.data = JSON.stringify(response.data);
                 TempTaskData = response;
                 tmpLS = ls;
@@ -130,10 +132,11 @@ const _loadTask = function(ls, url, completionID, reset) {
                 ls.assignTask(response);
                 ls.initializeStore(_convertTask(response));
                 ls.updateDescription(response.description);
+
                 let cs = ls.completionStore;
                 let c;
 
-                if (ls.completionStore.completions.length > 0 && completionID === 'auto') {
+                if (ls.completionStore.completions.length > 0 && (completionID === 'auto' || isAdmin)) {
                   c = {id: ls.completionStore.completions[0].id};
                 }
 
@@ -146,7 +149,7 @@ const _loadTask = function(ls, url, completionID, reset) {
                     c = {id: 1};
                 }
 
-                else if (ls.completionStore.completions.length > 0 && (response.format_type == 1) ) {
+                else if (ls.completionStore.completions.length > 0 && (response.format_type == 1 || response.format_type == 6) ) {
                     c = {id: completionID};
                 }
 
@@ -159,8 +162,24 @@ const _loadTask = function(ls, url, completionID, reset) {
                 // fix for broken old references in mst
                 cs.selected.setupHotKeys();
                 ls.setFlags({ isLoading: false });
-                ls.onTaskLoad(ls, ls.task);
-                MyDOList(ls, ls.task);
+                // ls.onTaskLoad(ls, ls.task);
+                setTimeout(function () {
+                    if (isAdmin){
+                        if (response.format_type == 3){
+                            btndiv = $(".Controls_container__LTeAA")[0];
+                            $('.ls-update-btn').hide()
+                            $('.ls-submit-btn').hide();
+                            var submitbutton = $('<button type="button" class="ant-btn ant-btn-primary mysubmitbtn"><span role="img" aria-label="check" class="anticon anticon-check"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 00-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"></path></svg></span><span>Submit </span></button>');
+                            btndiv.append(submitbutton[0]);
+                            submitbutton.on('click', function(){
+                               ls.submitCompletion();
+                            });
+                        }
+                    } else {
+                        MyDOList(ls, ls.task);
+                    }
+                }, (400));
+
               // }
             })
         });
@@ -169,77 +188,147 @@ const _loadTask = function(ls, url, completionID, reset) {
     }
 };
 function MyDOList(ls, task){
-      if (task && task.dataObj.format_type == 1 ) {
-          if (task.dataObj.completions != null){
-              var Skipbtn = $('.ls-skip-btn').children().first();
-              Skipbtn.html('').append("<span>Got It </span>");
-              // $('.ls-skip-btn').hide();
-              Skipbtn.on('click', function () {
-                  c = ls.completionStore.addCompletion({userGenerate: true});
-                  cs.selectCompletion(c.id);
-              });
-              $('.ls-update-btn').hide();
-              $('.ls-submit-btn').hide();
-         }
-
-            // var Updatebtn = $('.ls-update-btn').children().first().next();
-            // Updatebtn.html('').append ("<span>Got it </span>");
-            // var Submitbtn = $('.ls-submit-btn').children().first().next();
-            // Submitbtn.html('').append ("<span>Got it </span>");
-
-        } else if (task && task.dataObj.format_type == 2) {
-            setTimeout(function () {
-                startIntroForRE(task.dataObj.completions[0].result, tmpLS);
-            }, (1 * 1000));
-        } else if (task && task.dataObj.format_type == 3) {
+    if (task && task.dataObj.format_type == 1 ) {
+        if (task.dataObj.completions != null){
+            var Skipbtn = $('.ls-skip-btn');
+            Skipbtn.html('').append("<span>Show Me more</span>");
+            // $('.ls-skip-btn').hide();
+            Skipbtn.on('click', function () {
+                c = ls.completionStore.addCompletion({userGenerate: true});
+                ls.completionStore.selectCompletion(c.id);
+            });
             btndiv = $(".Controls_container__LTeAA")[0];
-            var btn = $('<button type="button" class="ant-btn ant-btn-ghost helpBtn"><span>Help Me Understand</span></button>');
+            var btn = $('<button type="button" class="ant-btn ant-btn-primary helpBtn"><span>Next</span></button>');
             btndiv.append(btn[0]);
+            $('.helpBtn').on('click', function () {
+              c = ls.completionStore.addCompletion({userGenerate: true});
+              ls.completionStore.selectCompletion(c.id);
+              // tmpLS = ls;
+              // tmpLS.onSubmitCompletion();
+              ls.submitCompletion();
+            });
+            $('.ls-update-btn').hide();
+            $('.ls-submit-btn').hide();
+            ls.completionStore.selected.setEdit(false);
+            showDemo = Cookies.get("showInro" + task.dataObj.format_type.toString());
+            if (showDemo == undefined) {
+                q = introJs().setOptions({
+                    tooltipClass: 'customTooltip',doneLabel: "Let's Start",exitOnOverlayClick: false,exitOnEsc: false,showBullets: false,showStepNumbers: false,overlayOpacity: 0.5,disableInteraction: true,
+                    steps: [{
+                    title: 'Welcome 👋',
+                    intro: 'This shows the final result of task that you are going to do'
+                    }]
+                });
+                q.start();
+                Cookies.set("showInro" + task.dataObj.format_type.toString(), true, { expires: 1 });
+                // Cookies.remove("example");
+            }
+        }
+    } else if (task && task.dataObj.format_type == 2) {
+        if (task.dataObj.layout_id == 8) {
+            $.getScript('static/js/AutointroPolygon.js');
+        } else if(task.dataObj.layout_id == 2) {
+            $.getScript('static/js/AutointroRE.js');
+        } else if(task.dataObj.layout_id == 9) {
+            $.getScript('static/js/AutointroImageClassification.js');
+        }
+        setTimeout(function () {
+            tmpLS = ls;
+            startIntro(task.dataObj.completions[0].result, tmpLS);
+            // c = {id: ls.completionStore.completions[1].id, editable: false};
+            // ls.completionStore.selectCompletion(c.id);
+        }, (1 * 1000));
+    } else if (task && task.dataObj.format_type == 3) {
+            btndiv = $(".Controls_container__LTeAA")[0];
+            if ($(".helpBtn")[0] != undefined) {
+                $(".helpBtn")[0].remove();
+            }
+            var btn = $('<button type="button" class="ant-btn ant-btn-ghost helpBtn" style="background: #52c41a; background-color: #52c41a; color: white"><span>See Answer</span></button>');
+            // btn[0].appendTo(btndiv);
+            btndiv.appendChild(btn[0]);
             $(".helpBtn").on('click', function(){
                 tmpLS = ls;
-                reRenderTask(tmpLS, TempTaskData);
+                reRenderTask(tmpLS);
             });
+    } else if (task && task.dataObj.format_type == 6) {
+        btndiv = $(".Controls_container__LTeAA")[0];
+        $('.ls-update-btn').hide()// children().first().next().html('').append ("<span>Submit </span>");
+        $('.ls-submit-btn').hide();
+        ls.completionStore.selected.setEdit(false);
+                                                                //green hash #52c41a
+        var btn = $('<button type="button" class="ant-btn ant-btn-secondary helpBtn" style="background: #52c41a; background-color: #08979c; color: white"><span>Edit</span></button>');
+        var submitbutton = $('<button type="button" class="ant-btn ant-btn-primary mysubmitbtn"><span role="img" aria-label="check" class="anticon anticon-check"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 00-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"></path></svg></span><span>Submit </span></button>');
+        btndiv.append(submitbutton[0]);
+        btndiv.append(btn[0]);
+        submitbutton.on('click', function(){
+           ls.submitCompletion();
+        });
+        $(".helpBtn").on('click', function(){
+            ls.completionStore.selected.setEdit(true);
+            $(".helpBtn").hide();
+            $('.mysubmitbtn').hide();
+            var updatebtn = $('<button type="button" class="ant-btn ant-btn-primary myupdatebtn"><span role="img" aria-label="check-circle" class="anticon anticon-check-circle"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check-circle" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M699 353h-46.9c-10.2 0-19.9 4.9-25.9 13.3L469 584.3l-71.2-98.8c-6-8.3-15.6-13.3-25.9-13.3H325c-6.5 0-10.3 7.4-6.5 12.7l124.6 172.8a31.8 31.8 0 0051.7 0l210.6-292c3.9-5.3.1-12.7-6.4-12.7z"></path><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z"></path></svg></span><span>Update </span></button>');
+                btndiv.append(updatebtn[0]);
+                updatebtn.on('click', function (){
+                     ls.submitCompletion();
+            })
+        });
+        showDemo = Cookies.get("showInro" + task.dataObj.format_type.toString());
+        if (showDemo == undefined) {
+            q = introJs().setOptions({
+                tooltipClass: 'customTooltip',doneLabel: "Let's Start",exitOnOverlayClick: false,exitOnEsc: false,showBullets: false,showStepNumbers: false,overlayOpacity: 0.5,disableInteraction: true,
+                steps: [{
+                    title: 'Welcome 👋',
+                    intro: 'Other User has done this task, Does it look okay to you? You can edit if not!'
+                }]
+            });
+            Cookies.set("showInro" + task.dataObj.format_type.toString(), true, { expires: 1 });
+            // Cookies.remove("example");
+            q.start();
         }
+    }
 }
-function reRenderTask(ls, response, completionID){
+
+function reRenderTask(ls){
     // ls.resetState();
     // ls.assignTask(response);
     // ls.initializeStore(_convertTask(response));
     // ls.updateDescription(response.description);
     let cs = ls.completionStore;
     let c;
-
-    // if (ls.completionStore.completions.length > 0 && completionID === 'auto') {
-      c = {id: ls.completionStore.completions[0].id, editable: false};
-    // }
-    //
-    // else if (cs.predictions.length > 0) {
-    //     c = ls.completionStore.addCompletionFromPrediction(cs.predictions[0]);
-    // }
-    //
-    // // we are on history item, take completion id from history
-    // else if (ls.completionStore.completions.length > 0 && completionID) {
-    //     c = {id: 1};
-    // }
-    //
-    // else {
-    //     c = {id: completionID, editable: false};
-    // }
-
-    if (c.id) cs.selectCompletion(c.id);
-
-    // fix for broken old references in mst
-    cs.selected.setupHotKeys();
-    ls.setFlags({ isLoading: false });
-    var Skipbtn = $('.ls-skip-btn').children().first();
-    Skipbtn.html('').append ("<span>Next </span>");
-    Skipbtn.on('click', function(){
-        c = ls.completionStore.addCompletion({ userGenerate: true });
+    if (ls.completionStore.selected.id === cs.completions[0].id){
+        c = {id: cs.completions[1].id, editable: false};
         cs.selectCompletion(c.id);
-        // ls.onSkipTask(ls);
-    });
-    $('.ls-update-btn').hide();
-    $('.ls-submit-btn').hide();
+        cs.selected.setupHotKeys();
+        btndiv = $(".Controls_container__LTeAA")[0];
+        $(".helpBtn").children().first().html('').append ("<span>Back to Task </span>");
+
+        $('.ls-skip-btn').hide();
+        $('.ls-update-btn').hide();
+        $('.ls-submit-btn').hide();
+        ls.completionStore.selected.setEdit(false);
+    } else {
+        c = {id: cs.completions[0].id, editable: false};
+        cs.selectCompletion(c.id);
+        cs.selected.setupHotKeys();
+        $(".helpBtn").children().first().html('').append ("<span>See Answer </span>");
+        parent = $(".helpBtn").parent();
+        parent.children().eq(1).before(parent.children().last());
+        $('.ls-skip-btn').show();
+        $('.ls-update-btn').show();
+        $('.ls-submit-btn').show();
+        ls.completionStore.selected.setEdit(true);
+    }
+
+
+    // var Skipbtn = $('.ls-skip-btn').children().first();
+    // Skipbtn.html('').append ("<span>Next </span>");
+    // Skipbtn.on('click', function(){
+    //     c = ls.completionStore.addCompletion({ userGenerate: true });
+    //     cs.selectCompletion(c.id);
+    //     // ls.onSkipTask(ls);
+    // });
+
 }
 
 const loadNext = function(ls, reset, trainingTask, batchid) {
@@ -279,10 +368,11 @@ const _convertTask = function(task) {
 };
 
 
-const LSF_SDK = function(elid, config, task, hide_skip, description, reset, response, batchid, numofPanel) {
+const LSF_SDK = function(elid, config, task, hide_skip, description, reset, response, batchid, numofPanel, _isAdmin) {
 
   const showHistory = task === null;  // show history buttons only if label stream mode, not for task explorer
   const batch_id = batchid;
+  isAdmin = _isAdmin;
   const _prepData = function(c, includeId) {
     var completion = {
       lead_time: (new Date() - c.loadedDate) / 1000,  // task execution time
@@ -334,14 +424,14 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
       // interfaces.push("predictions");
      // interfaces.push("predictions:menu"); // right menu with prediction items
-     interfaces.push("completions:menu"); // right menu with completion items
+     // interfaces.push("completions:menu"); // right menu with completion items
      // interfaces.push("completions:menu"); // right menu with completion items
      // interfaces.push("completions:add-new");
      // interfaces.push("completions:delete");
      interfaces.push("side-column"); // entity
      interfaces.push("skip");
-     interfaces.push("leaderboad");
-     interfaces.push("messages");
+     // interfaces.push("leaderboad");
+     // interfaces.push("messages");
   }
 
   var LS = new LabelStudio(elid, {
@@ -401,175 +491,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
                      'Next <i class="ui icon fa-angle-right"></i></button>');
         firstBlock.after(block);
       }
-        // alert(document.querySelector('[class^="ant-tag"]'));
-      //   tags = document.getElementsByClassName('ant-tag');
-      // bts = document.getElementsByClassName("ant-btn ");
-      //   // textArea = document.querySelector('[class^="Text_block"]');
-      //   labelbtns = document.getElementsByClassName('ls-entity-buttons')[0];
-      //   $($(".ant-tag")[0]).wrap("<div class='myclass1' style='width: 150px; height: 50px; padding: 15px'></div>");
-      //   var q = introJs().setOptions({
-      //       // showButtons: false,
-      //       showBullets: false,
-      //       // showStepNumbers: false,
-      //       // overlayOpacity: 0.1,
-      //       disableInteraction: false,
-      //       steps: [
-      //           {
-      //               title: 'Welcome',
-      //               intro: 'Hello World! 👋'
-      //           },{
-      //               title: 'Select Tag',
-      //               element: document.getElementsByClassName('myclass1')[0],
-      //               intro: "Select Tag",
-      //               position: 'top'
-      //           }
-      //       ]
-      //   });
-      //   q.start();
 
-        ///////////////////////    Image Intro ///////////////////
-        // setTimeout(function() {
-        // tags[0].click();
-        // textArea = document.getElementsByTagName("canvas");
-        // textArea = document.getElementsByClassName('ImageView_container__AOBmH');
-        // const rect = textArea[0].getBoundingClientRect();
-        //
-        // _left = rect.x + window.scrollX;
-        // _top = Math.floor(rect.y) + window.scrollY;
-        // //
-        // console.log(_left);
-        // console.log(_top);
-        //
-        // qwe = document.elementFromPoint(_left, _top);
-        // var evt = document.createEvent("MouseEvents");
-        // evt.initEvent("mousedown", true, true, document.defaultView, 0, 0, 0, _left, _top);
-        // qwe.dispatchEvent(evt);
-        // //
-        // var evt = document.createEvent("MouseEvents");
-        // evt.initEvent("mouseup", true, true, document.defaultView, 0, 0, 0, _left, _top);
-        // qwe.dispatchEvent(evt);
-        // //
-        // var evt = document.createEvent("MouseEvents");
-        // evt.initEvent("click", true, true, document.defaultView, 0, 0, 0, _left, _top);
-        // qwe.dispatchEvent(evt);
-        //
-        // qwe = document.elementFromPoint(468, 448);
-        // var evt = document.createEvent("MouseEvents");
-        // evt.initEvent("mousedown", true, true);
-        // qwe.dispatchEvent(evt);
-        //
-        // var evt = document.createEvent("MouseEvents");
-        // evt.initEvent("mouseup", true, false);
-        // qwe.dispatchEvent(evt);
-        //
-        // var evt = document.createEvent("MouseEvents");
-        // evt.initEvent("click", true, false);
-        // qwe.dispatchEvent(evt);
-        // },(3*1000));
-
-
-        ///////////////////////////        Automated intro for text labeling and relation      ////////////////////////
-        // var waitTime = 1;
-        // elemenq = document.querySelector('[class^="Text_line"]');
-        // setTimeout(function(){
-        //     q.nextStep();
-        //     setTimeout(function(){
-        //         tags[0].click();
-        //         setTimeout(function(){
-        //             q.nextStep();
-        //             setTimeout(function(){
-        //                 let range = new Range();
-        //                 range.setStart(elemenq.firstChild, 5);
-        //                 range.setEnd(elemenq.firstChild, 10)
-        //                 window.getSelection().removeAllRanges();
-        //                 window.getSelection().addRange(range);
-        //                 var evt = document.createEvent("MouseEvents");
-        //                 evt.initEvent("mouseup", true, true);
-        //                 elemenq.dispatchEvent(evt);
-        //                 setTimeout(function(){
-        //                     labelbtns = document.getElementsByClassName('ls-entity-buttons')[0];
-        //                     q.addStep({title: 'Action Buttons', element: labelbtns, intro: 'Create Relation, Add meta info, UnSelect or Delete Tag', position: 'top'});
-        //                     q.refresh();
-        //                     lastElementIndex = q._options.steps.length - 1;
-        //                     q._introItems.push(q._options.steps[lastElementIndex]);
-        //                     q._introItems[lastElementIndex].step = lastElementIndex + 1;
-        //                     q._introItems[lastElementIndex].disableInteraction = true;
-        //                     q.nextStep();
-        //                     setTimeout(function(){
-        //                         b1 = labelbtns.children[2];
-        //                         q.addStep({title: 'Unselect', intro: "Unselect for next ", element: b1, position: 'top'});
-        //                         lastElementIndex = q._options.steps.length - 1;
-        //                         q._introItems.push(q._options.steps[lastElementIndex]);
-        //                         q._introItems[lastElementIndex].step = lastElementIndex + 1;
-        //                         q._introItems[lastElementIndex].disableInteraction = true;
-        //                         q.nextStep();
-        //                         setTimeout(function(){
-        //                             b1.click();
-        //                             q.addStep({title: 'Select Tag', intro: "Select 2nd Tag", element: tags[3], position: 'top'});
-        //                             lastElementIndex = q._options.steps.length - 1;
-        //                             q._introItems.push(q._options.steps[lastElementIndex]);
-        //                             q._introItems[lastElementIndex].step = lastElementIndex + 1;
-        //                             q._introItems[lastElementIndex].disableInteraction = true;
-        //                             q.nextStep();
-        //                             setTimeout(function(){
-        //                                 tags[3].click();
-        //                                 q.addStep({title: 'Highlight Text!', element: textArea, intro: 'Select Text with mouse!', position: 'top'});
-        //                                 lastElementIndex = q._options.steps.length - 1;
-        //                                 q._introItems.push(q._options.steps[lastElementIndex]);
-        //                                 q._introItems[lastElementIndex].step = lastElementIndex + 1;
-        //                                 q._introItems[lastElementIndex].disableInteraction = true;
-        //                                 q.nextStep();
-        //                                 setTimeout(function(){
-        //                                     let range = new Range();
-        //                                     range.setStart(elemenq.lastChild, elemenq.lastChild.textContent.indexOf("China"));
-        //                                     range.setEnd(elemenq.lastChild, elemenq.lastChild.textContent.indexOf("China") + 2)
-        //                                     window.getSelection().removeAllRanges();
-        //                                     window.getSelection().addRange(range);
-        //                                     var evt = document.createEvent("MouseEvents");
-        //                                     evt.initEvent("mouseup", true, true);
-        //                                     elemenq.dispatchEvent(evt);
-        //                                     setTimeout(function(){
-        //                                         // q.exit();
-        //                                         labelbtns1 = document.getElementsByClassName('ls-entity-buttons')[0];
-        //                                         b2 = labelbtns1.children[0];
-        //                                         q.addStep({title: 'Relations', element: b2, intro: 'Click to start relation process', position: 'top'});
-        //                                         lastElementIndex = q._options.steps.length - 1;
-        //                                         q._introItems.push(q._options.steps[lastElementIndex]);
-        //                                         q._introItems[lastElementIndex].step = lastElementIndex + 1;
-        //                                         q._introItems[lastElementIndex].disableInteraction = true;
-        //                                         q.nextStep();
-        //                                         setTimeout(function(){
-        //                                             b2.click();
-        //                                             rlspan = document.querySelector('[data-labels^="Person"]');
-        //                                             q.addStep({title: 'Relations', element: rlspan, intro: 'Click to create Relation!', position: 'top'});
-        //                                             lastElementIndex = q._options.steps.length - 1;
-        //                                             q._introItems.push(q._options.steps[lastElementIndex]);
-        //                                             q._introItems[lastElementIndex].step = lastElementIndex + 1;
-        //                                             q._introItems[lastElementIndex].disableInteraction = true;
-        //                                             q.nextStep();
-        //                                             setTimeout(function(){
-        //                                                 q.exit();
-        //                                                 var evt = document.createEvent("MouseEvents");
-        //                                                 evt.initEvent("mouseover", true, true);
-        //                                                 rlspan.dispatchEvent(evt);
-        //                                                 var evt = document.createEvent("MouseEvents");
-        //                                                 evt.initEvent("mousedown", true, true);
-        //                                                 rlspan.dispatchEvent(evt);
-        //                                                 var evt = document.createEvent("MouseEvents");
-        //                                                 evt.initEvent("click", true, false);
-        //                                                 rlspan.dispatchEvent(evt);
-        //                                             },(waitTime*1000));
-        //                                         },(waitTime*1000));
-        //                                     },(waitTime*1000));
-        //                                 },(waitTime*1000));
-        //                             },(waitTime*1000));
-        //                         },(waitTime*1000));
-        //                     },(waitTime*1000));
-        //                 },(waitTime*1000));
-        //             },(waitTime*1000));
-        //         },(waitTime*1000));
-        //     },(waitTime*1000));
-        // },(waitTime*1000));
 
     },
 
@@ -679,7 +601,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
         }
 
         if (c.id) cs.selectCompletion(c.id);
-           ls.onTaskLoad(ls, ls.task);
+        // ls.onTaskLoad(ls, ls.task);
       }
       // alert("Bilal 3");
     }

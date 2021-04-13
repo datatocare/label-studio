@@ -32,11 +32,11 @@ def checkAndgetTrainginTask(userID, batchid):
             db.session.delete(r)
         db.session.commit()
     # nextTask = db.session.query(Task).filter(Task.batch_id==batchid, Task.format_type == 1, Task.id.notin_(Taskidcompleted)).first()
-    nextTask = db.session.execute(
-        'SELECT * FROM TrainingTask WHERE batch_id=:batchid and TrainingTask.format_type == 1 and '
-        'id not in (select task_id from completions where user_id = :userID and '
-        'task_id in (select id from TrainingTask where batch_id= :batchid and TrainingTask.format_type == 1) ) order by id',
-        {'userID': userID,'batchid':batchid }).first()
+        nextTask = db.session.execute(
+            'SELECT * FROM TrainingTask WHERE batch_id=:batchid and TrainingTask.format_type == 1 and '
+            'id not in (select task_id from completions where user_id = :userID and '
+            'task_id in (select id from TrainingTask where batch_id= :batchid and TrainingTask.format_type == 1) ) order by id',
+            {'userID': userID,'batchid':batchid }).first()
     # nextTask = db.session.execute(
     #     'SELECT * FROM TrainingTask WHERE batch_id=:batchid and format_type == 1 ',
     #     {'userID': userID, 'batchid': batchid}).first()
@@ -177,18 +177,27 @@ class JsonDBStorage(BaseStorage):
             # print(r['my_column'])  # Access by column name as a string
             # r_dict = dict(r.items())  # convert to dict keyed by column names
             #  return r.__dict_
-        if taskType in (1, 2, 3, 4):
+        # if taskType in (1, 2):
+        #     nextTask = db.session.execute(
+        #         'SELECT * FROM task WHERE id in (select task_id from completions where user_id != :userID ) and id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
+        #         {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first() #and id not in (select task_id from completions where user_id = :userID )
+        #     if nextTask is None:
+        #         nextTask = db.session.execute(
+        #                'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
+        #             {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
+        if taskType in (1,2,3, 4):
             nextTask = db.session.execute(
-                'SELECT * FROM task WHERE id in (select task_id from completions where user_id != :userID ) and id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
-                {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
-            if nextTask is None:
-                nextTask = db.session.execute(
-                       'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
-                    {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
-        elif taskType in (5, 6) :
+                'SELECT * FROM task WHERE id in (select task_id from completions where completions.user_id = 0 and completions.batch_id = :batchid ) and id not in (select task_id from completions where user_id = :userID  and completions.batch_id = :batchid) and batch_id = :batchid and format_type = :taskType order by random() LIMIT 1',
+                {'userID': userID, 'batchid': batchid, 'taskType': 1}).first()
+            # if nextTask is None:
+            #     nextTask = db.session.execute(
+            #            'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
+            #         {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
+        elif taskType in (5, 6):
             nextTask = db.session.execute(
-                'SELECT * FROM task WHERE id NOT in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1',
-                {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
+                # 'SELECT * FROM task WHERE id NOT in (select task_id from completions where completions.user_id = 0 and completions.batch_id = :batchid ) and id not in (select task_id from completions where user_id = :userID and completions.batch_id = :batchid ) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1',
+                'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID and completions.batch_id = :batchid ) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1',
+                {'userID': userID, 'batchid': batchid, 'taskType': 1}).first()
 
         # TODO : Check if completion is empty the re elect task
 

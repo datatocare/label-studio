@@ -24,7 +24,7 @@ except ModuleNotFoundError:
 # setup default config for logging
 with io.open(os.path.join(os.path.dirname(__file__), 'logger.json')) as f:
     logging.config.dictConfig(json.load(f))
-
+import random
 from uuid import uuid4
 from urllib.parse import unquote
 from datetime import datetime
@@ -263,6 +263,7 @@ def labeling_page(batchid = '0'):
             us = UserScore(user_id=user_id, batch_id=batch_id, score=20, showDemo=False, current_task_type=1)
             db.session.add(us)
             db.session.commit()
+            userScore = us
 
         if task_id is not None:
             task_id = int(task_id)
@@ -273,7 +274,7 @@ def labeling_page(batchid = '0'):
             if g.project.ml_backends_connected:
                 task_data = g.project.make_predictions(task_data)
         else:
-            task = g.project.next_task(user_id, 1, batch_id)
+            task = g.project.next_task(user_id, userScore.current_task_type, batch_id)
             if task is not None:
                 # no tasks found
                 Newtask = {}
@@ -288,7 +289,8 @@ def labeling_page(batchid = '0'):
                 ar["type"] = 3
                 ar["message"] = "Give your Answer"
                 task["taskAnswerResponse"] = ar
-                task["format_type"] = Newtask['data']['format_type']
+                Newtask['data']['format_type'] = userScore.current_task_type
+                task["format_type"] = userScore.current_task_type #Newtask['data']['format_type']
                 if 'completions' in Newtask['data']:
                     task["completions"] = Newtask['data']['completions']
 
@@ -321,6 +323,99 @@ def labeling_page(batchid = '0'):
         **find_editor_files()
     )
 
+@blueprint.route('/AdminLabeling')
+@flask_login.login_required
+@exception_handler_page
+def admin_labeling_page():
+    """ Label stream for tasks
+    """
+
+    batchid = request.args.get('batchid', None)
+    if batchid == '0':
+        return redirect(flask.url_for('label_studio.batches_page'))
+
+    # if g.project.no_tasks():
+    #     return redirect(url_for('label_studio.welcome_page'))
+    if not flask_login.current_user.is_admin:
+        return redirect(flask.url_for('label_studio.not_authorised_page'))
+
+    # task data: load task or task with completions if it exists
+    batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
+    if batch_id is None:
+        return redirect(flask.url_for('label_studio.invalid_page'))
+    else:
+        task_data = None
+        user_id = flask_login.current_user.get_id()
+
+        userScore = UserScore.query.filter_by(user_id=user_id, batch_id=batch_id).first()
+        if userScore is None:
+            us = UserScore(user_id=user_id, batch_id=batch_id, score=20, showDemo=False, current_task_type=1)
+            db.session.add(us)
+            db.session
+
+        StepType = userScore.current_task_type
+
+        nextTask = db.session.execute("SELECT * FROM task join completions on task.id == completions.task_id "
+                                      "WHERE task.id NOT in (select task_id from completions as cm2 where cm2.user_id == 0 and "
+                                      "cm2.batch_id =:batchid ) and task.batch_id = :batchid and task.format_type = :taskType"
+                                      " order by RANDOM() LIMIT 1",
+        {'userID': user_id, 'batchid': batch_id, 'taskType': 1}).first()
+
+        if nextTask is None:
+            nextTask = db.session.execute(
+                'SELECT * FROM task WHERE id not in (select task_id from completions '
+                'where completions.user_id == 0 and completions.batch_id = :batchid) '
+                'and batch_id = :batchid and format_type = :taskType order by random() limit 1',
+                {'userID': user_id, 'batchid': batch_id, 'taskType': 1}).first()
+
+        task = nextTask
+        if task is not None:
+            # no tasks found
+            Newtask = {}
+            Newtask['data'] = task
+            Newtask['id'] = task['id']
+            db_layout = Layout.query.filter_by(id=task['layout_id']).first()
+            Newtask['layout'] = db_layout.data  # task['layout']
+            Newtask['description'] = task['description']
+            # Newtask['showDemo'] = task['showDemo']
+            task = Newtask
+            ar = {}
+            ar["type"] = 3
+            ar["message"] = "Give your Answer"
+            task["taskAnswerResponse"] = ar
+            Newtask['data']['format_type'] = StepType
+            task["format_type"] = StepType#Newtask['data']['format_type']
+            if 'completions' in Newtask['data']:
+                task["completions"] = Newtask['data']['completions']
+
+
+            # if "result" in task["data"]:
+            # completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(), task_id=task_id).first()
+            # if completion is not None:
+            #     completionData = json.loads(task["data"]["result"])
+            #     completionData['id'] = 1
+                # logger.debug(json.dumps(json.loads(completion.data), indent=2))
+                # task["completions"] = [completionData]  # [json.loads(completion.data)]
+
+            # task = resolve_task_data_uri(task)
+
+            task = resolve_task_data_uri(task, project=g.project)
+        else:
+            task = {}
+            task['layout'] = g.project.label_config_line
+        logger.debug(json.dumps(task, indent=2))
+    return flask.render_template(
+        'AdminLabeling.html',
+        project=g.project,
+        config=g.project.config,
+        label_config_line=task['layout'],
+        # task_id=task_id,
+        task_data=task_data,
+        user=flask_login.current_user,
+        batchid=batchid,
+        # showDemo=task['showDemo'],
+        **find_editor_files()
+    )
 
 @blueprint.route('/welcome')
 @flask_login.login_required
@@ -473,6 +568,31 @@ def import_page():
         user=flask_login.current_user,
         project=g.project
     )
+
+
+@blueprint.route('/Myimport')
+@flask_login.login_required
+@exception_handler_page
+def my_import_page():
+    """ Import tasks from JSON, CSV, ZIP and more
+    """
+    task= {'text': 'ABBA Live is an album of live recordings by Swedish pop group ABBA , released by Polar Music in 1986. A live album was something that many ABBA fans had demanded for several years. ABBA themselves had toyed with the idea on a couple of occasions , but always decided against it. Finally , four years after the members went their separate ways , a live collection was released after all. The resultant album , ABBA Live , contained recordings from 1977 , 1979 and 1981. The tracks were mostly taken from ABBA ’s concerts at Wembley Arena in London in November 1979 , with a few additional songs taken from the tour of Australia in March 1977 and the Dick Cavett Meets ABBA television special , taped in April 1981. When this LP / CD was released , the band \'s popularity was at an all - time low and none of the members themselves were involved in the production of the album. Much to the dismay of both music critics and ABBA fans it also had 80 \'s synth drums overdubbed on most tracks , taking away the true live feeling of the performances. Neither did it feature any of the tracks that the band had performed live on their tours but never included on any of their studio albums , such as " I Am an A " , " Get on the Carousel " , " I \'m Still Alive " , or the original live versions of the songs from the 1977 mini - musical The Girl with the Golden Hair : " Thank You for the Music " , " I Wonder ( Departure ) " and " I \'m a Marionette " , all of which had slightly different lyrics and/or musical arrangements to the subsequent studio recordings included on. Several tracks had also been heavily edited , in the case of the 1979 live recording of " Does Your Mother Know " by as much as five minutes since it originally was performed on that tour as a medley with " Hole in Your Soul ". ABBA Live was the first ABBA album to be simultaneously released on LP and CD , the CD having three " extra tracks ". The album did not perform very well , internationally or domestically , peaking at # 49 in Sweden and only staying in the charts for two weeks. It was remastered and rereleased by Polydor / Polar in 1997 , but is currently out of print.', 'layout_id': 2, 'groundTruth': ' ', 'format_type': 1, 'batch_id': 1, 'description': ' ', 'id': 0}
+    # task  = json.loads("x")
+    # completion = {'task_id': 35, 'user_id': 0, 'data': '{"lead_time": 3.821, "result": [{"value": {"start": 0, "end": 1, "text": "Polar Music", "labels": ["Organization"]}, "id": "Q930T6M", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 0, "end": 1, "text": "Sweden", "labels": ["Location"]}, "id": "QD1WUAX", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": "P495", "direction": "bi", "from_id": "Q930T6M", "to_id": "QD1WUAX", "type": "relation"}], "user": 0, "created_at": 1616101190}', 'completed_at': '1616127668', 'batch_id': 1, 'was_skipped': 0}
+    # completion = {'task_id': 37, 'user_id': 0, 'data': '{"lead_time": 3.821, "result": [{"value": {"start": 81, "end": 92, "text": "Polar Music", "labels": ["Organization"]}, "id": "I1RJK0V", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 2003, "end": 2009, "text": "Sweden", "labels": ["Location"]}, "id": "ED155JD", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": "country of origin", "direction": "bi", "from_id": "I1RJK0V", "to_id": "ED155JD", "type": "relation"}], "user": 0}', 'completed_at': 1616101190, 'batch_id': 1, 'was_skipped': 0}
+    # completion = {'task_id': 37, 'user_id': 0, 'data': '{"lead_time": 3.821, "result": [{"value": {"start": 63, "end": 70, "text": "Piraeus", "labels": ["Location"]}, "id": "BAIWKP0", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 548, "end": 554, "text": "Greece", "labels": ["Location"]}, "id": "IJYQKAD", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["country"], "direction": "bi", "from_id": "BAIWKP0", "to_id": "IJYQKAD", "type": "relation"}, {"value": {"start": 90, "end": 100, "text": "Skai Group", "labels": ["Organization"]}, "id": "ULZ6X0L", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 548, "end": 554, "text": "Greece", "labels": ["Location"]}, "id": "RT3Z1LX", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["country"], "direction": "bi", "from_id": "ULZ6X0L", "to_id": "RT3Z1LX", "type": "relation"}, {"value": {"start": 217, "end": 223, "text": "Athens", "labels": ["Location"]}, "id": "RSUC7EN", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 548, "end": 554, "text": "Greece", "labels": ["Location"]}, "id": "H7KFCY4", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["country"], "direction": "bi", "from_id": "RSUC7EN", "to_id": "H7KFCY4", "type": "relation"}, {"value": {"start": 0, "end": 7, "text": "Skai TV", "labels": ["Organization"]}, "id": "OR8M1WN", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 63, "end": 70, "text": "Piraeus", "labels": ["Location"]}, "id": "QN82EFF", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["headquarters location"], "direction": "bi", "from_id": "OR8M1WN", "to_id": "QN82EFF", "type": "relation"}, {"value": {"start": 0, "end": 7, "text": "Skai TV", "labels": ["Organization"]}, "id": "R5T0BUC", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 90, "end": 100, "text": "Skai Group", "labels": ["Organization"]}, "id": "65YKQ4J", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["owned by"], "direction": "bi", "from_id": "R5T0BUC", "to_id": "65YKQ4J", "type": "relation"}, {"value": {"start": 0, "end": 7, "text": "Skai TV", "labels": ["Organization"]}, "id": "PQ7XL0D", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 217, "end": 223, "text": "Athens", "labels": ["Location"]}, "id": "1T2Y8KO", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["headquarters location"], "direction": "bi", "from_id": "PQ7XL0D", "to_id": "1T2Y8KO", "type": "relation"}, {"value": {"start": 0, "end": 7, "text": "Skai TV", "labels": ["Organization"]}, "id": "SBPUJ0F", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 548, "end": 554, "text": "Greece", "labels": ["Location"]}, "id": "LACGGY9", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["country"], "direction": "bi", "from_id": "SBPUJ0F", "to_id": "LACGGY9", "type": "relation"}], "user": 0}', 'completed_at': 1616101190, 'batch_id': 1, 'was_skipped': 0}
+    completion = {'task_id': 37, 'user_id': 0, 'data': '{"lead_time": 3.821, "result": [{"value": {"start": 63, "end": 70, "text": "Piraeus", "labels": ["Location"]}, "id": "3L6VWCS", "from_name": "label", "to_name": "text", "type": "labels"}, {"value": {"start": 548, "end": 554, "text": "Greece", "labels": ["Location"]}, "id": "BHFODCL", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["country"], "direction": "bi", "from_id": "3L6VWCS", "to_id": "BHFODCL", "type": "relation"}, {"value": {"start": 90, "end": 100, "text": "Skai Group", "labels": ["Organization"]}, "id": "W7HWDJY", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["country"], "direction": "bi", "from_id": "W7HWDJY", "to_id": "BHFODCL", "type": "relation"}, {"value": {"start": 217, "end": 223, "text": "Athens", "labels": ["Location"]}, "id": "S93U28J", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["country"], "direction": "bi", "from_id": "S93U28J", "to_id": "BHFODCL", "type": "relation"}, {"value": {"start": 0, "end": 7, "text": "Skai TV", "labels": ["Organization"]}, "id": "N83BRAV", "from_name": "label", "to_name": "text", "type": "labels"}, {"labels": ["headquarters location"], "direction": "bi", "from_id": "N83BRAV", "to_id": "3L6VWCS", "type": "relation"}, {"labels": ["owned by"], "direction": "bi", "from_id": "N83BRAV", "to_id": "W7HWDJY", "type": "relation"}, {"labels": ["headquarters location"], "direction": "bi", "from_id": "N83BRAV", "to_id": "S93U28J", "type": "relation"}, {"labels": ["country"], "direction": "bi", "from_id": "N83BRAV", "to_id": "BHFODCL", "type": "relation"}], "user": 0}', 'completed_at': 1616101190, 'batch_id': 1, 'was_skipped': 0}
+
+    dbCompletion = Completion(user_id=completion["user_id"], task_id=completion['task_id'], data=completion['data'],
+                              completed_at=completion['completed_at'], batch_id=completion['batch_id'],
+                              was_skipped=completion['was_skipped'])  # ,hexID=completion["result"][0]['id']
+    db.session.add(dbCompletion)
+    # db.session.commit()
+    # db.session.add(dbtask)
+    db.session.commit()
+
+    return make_response('', 404)
+
 
 @blueprint.route('/importTasks')
 @flask_login.login_required
@@ -840,6 +960,21 @@ def api_task_import():
                 layout = layout["data"]
                 dblayout = Layout(data=layout["data"])
                 db.session.add(dblayout)
+        elif uploadType == "twc":
+            # parsed_data = json.loads(parsed_data)['tasks']
+            for task in parsed_data[0]['tasks']:
+                i = i + 1
+                dbtask = Task(text=task["text"], layout_id=task["layout_id"], groundTruth=task["groundTruth"],
+                              format_type=task["format_type"], batch_id=task["batch_id"], description=task["description"])
+                db.session.add(dbtask)
+                db.session.flush()
+                completion = task['completion']
+                dbCompletion = Completion(user_id=0, task_id=dbtask.id,
+                                          data=completion['data'],
+                                          completed_at=completion['completed_at'], batch_id=completion['batch_id'],
+                                          was_skipped=completion['was_skipped'])  # ,hexID=completion["result"][0]['id']
+
+                db.session.add(dbCompletion)
         else:
             return make_response("Invalid Type ", status.HTTP_400_BAD_REQUEST)
 
@@ -895,8 +1030,34 @@ def api_generate_next_task(batchid):
     if batch_id is None:
         return make_response('', 404)
     # traingTask = request.values.get('traingTask', False)
-    taskType = db.session.query(UserScore.current_task_type).filter(UserScore.user_id == userId).scalar()
-    task = g.project.next_task(userId, taskType, batch_id)
+    StepType = db.session.query(UserScore.current_task_type).filter(UserScore.user_id == userId, UserScore.batch_id == batch_id).scalar() # random
+    if flask_login.current_user.is_admin:
+        nextTask = db.session.execute("SELECT *, completions.id as comID  FROM task join completions on task.id == completions.task_id "
+                                  "WHERE task.id not in (select task_id from completions as cm2 where cm2.user_id == 0 and "
+                                  "cm2.batch_id =:batchid ) and task.batch_id = :batchid and task.format_type = :taskType"
+                                  " order by RANDOM() LIMIT 1",
+                                  {'userID': userId, 'batchid': batch_id, 'taskType': 1}).first()
+        if nextTask is None:
+            nextTask = db.session.execute(
+                'SELECT * FROM task WHERE id not in (select task_id from completions '
+                'where completions.user_id == 0 and completions.batch_id = :batchid ) '
+                'and batch_id = :batchid and format_type = :taskType order by random() limit 1',
+                {'userID': userId, 'batchid': batch_id, 'taskType': 1}).first()
+
+        if nextTask is not None:
+            dictTask = dict(nextTask.items())
+            if "data" in dictTask:
+                completionData = json.loads(nextTask.data)
+                completionData['id'] = nextTask["comID"]
+                # logger.debug(json.dumps(completionData, indent=2))
+                dictTask["completions"] = [completionData]  # [json.loads(completion.data)]
+                dictTask['completed_at'] = nextTask.completed_at
+                dictTask["id"] = dictTask["task_id"]
+            task = dictTask
+        else:
+            task = None
+    else:
+        task = g.project.next_task(userId, StepType, batch_id)
 
     if task is None:
         # no tasks found
@@ -908,10 +1069,11 @@ def api_generate_next_task(batchid):
     Newtask['layout'] = db_layout.data #task['layout']
     Newtask['description'] = task['description']
     task = Newtask
-    task["format_type"] = Newtask['data']['format_type']
+    Newtask['data']['format_type'] = StepType
+    task["format_type"] = StepType #Newtask['data']['format_type']
     if 'completions' in Newtask['data']:
         task["completions"] = Newtask['data']['completions']
-
+        # del(Newtask['data']['completions'])
     # if "result" in task["data"]:
         # completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(), task_id=task_id).first()
         # if completion is not None:
@@ -1119,35 +1281,62 @@ def api_tasks_completions(task_id):
     """
     task_id = int(task_id)
     user = flask_login.current_user.get_id()
+    if flask_login.current_user.is_admin:
+        user = 0
     # save completion
     batch_id = db.session.query(Task.batch_id).filter(Task.id==task_id).scalar()
     if request.method == 'POST':
         completion = request.json
 
         # cancelled completion
+        userScore = UserScore.query.filter_by(user_id=user, batch_id=batch_id).first()
         was_cancelled = request.values.get('was_cancelled', False)
         if was_cancelled:
             completion['was_cancelled'] = True
         else:
             completion.pop('skipped', None)  # deprecated
             completion.pop('was_cancelled', None)
-            userScore = UserScore.query.filter_by(user_id=user, batch_id=batch_id).first()
-            if userScore is not None:
-                userScore.score = userScore.score + 10
-            else:
-                us = UserScore(user_id=user, batch_id=batch_id, score=20, showDemo = False)
-                userScore = us
-
-            db.session.add(userScore)
-            db.session.commit()
-
+            # userScore = UserScore.query.filter_by(user_id=user, batch_id=batch_id).first()
 
         completion["user"] =  user
-        completion_id = g.project.save_completion_in_DB(task_id, completion)
+        completion_id = g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled)
         # checkscore(completion)
 
         logger.debug("Received completion" + json.dumps(completion, indent=2))
         logger.debug(completion_id)
+        if not was_cancelled:
+            if userScore is not None:
+                userScore.score = userScore.score + 10
+                if userScore.current_task_type == 1:
+                    userScore.current_task_type = 2
+                elif userScore.current_task_type == 2:
+                    userScore.current_task_type = 3
+                elif userScore.current_task_type == 3:
+                    numOfCompletions = Completion.query.join(Task, Task.id==Completion.task_id).filter(Completion.batch_id==batch_id, Completion.user_id==user, Completion.was_skipped==False, Task.format_type==1).count()
+                    if numOfCompletions >= 2:
+                        userScore.current_task_type = 4
+                elif userScore.current_task_type == 4:
+                    numOfCompletions = Completion.query.join(Task, Task.id==Completion.task_id).filter(Completion.batch_id==batch_id, Completion.user_id==user, Completion.was_skipped==False, Task.format_type==1).count()
+                    if numOfCompletions >= 2:
+                        userScore.current_task_type = 5
+                elif userScore.current_task_type == 5:
+                    rardNum = random.uniform(0, 1)
+                    if rardNum >= 0.2:
+                        userScore.current_task_type = 5
+                    else:
+                        userScore.current_task_type = 6
+                elif userScore.current_task_type == 6:
+                    rardNum = random.uniform(0, 1)
+                    if rardNum >=0.2:
+                        userScore.current_task_type = 5
+                    else:
+                        userScore.current_task_type = 6
+            else:
+                userScore = UserScore(user_id=user, batch_id=batch_id, score=20, showDemo = False, current_task_type=0)
+
+            db.session.add(userScore)
+            db.session.commit()
+
         # completion_id = g.project.save_completion(task_id, completion)
         return make_response(json.dumps({'id': completion_id}), 201)
 
@@ -1178,12 +1367,13 @@ def api_completion_by_id(task_id, completion_id):
     if request.method == 'PATCH':
         completion = request.json
         completion['id'] = completion_id
-        if 'was_cancelled' in completion:
-            completion['was_cancelled'] = False
-
+        was_cancelled = 'was_cancelled' in completion
+        # if 'was_cancelled' not in completion:
+        completion['was_cancelled'] = was_cancelled
+        batch_id = db.session.query(Task.batch_id).filter(Task.id == task_id).scalar()
         # g.project.save_completion(task_id, completion)
-        completion['id'] = completion_id
-        g.project.save_completion_in_DB(task_id, completion)
+        # completion['id'] = completion_id
+        g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled)
         return make_response('ok', 201)
 
     # delete completion

@@ -755,13 +755,13 @@
           this.columns = this.quick_columns;
           var layout = task.layout
           // init
-          if (window.LSF_SDK) {
+          if (!window.LSF_SDK) {
             //window.LSF_SDK._sdk.loadTask(task.id, 'auto');
-              window.LSF_SDK.resetState();
-              delete window.LSF_SDK;
-          } //else {
-            window.LSF_SDK = LSF_SDK("label-studio", layout, task, false, null, false, null);
-         //}
+            //  window.LSF_SDK.resetState();
+              //delete window.LSF_SDK;
+          //} //else {
+            window.LSF_SDK = LSF_SDK("label-studio", layout, task, false, null, false, null,null, 1);
+         }
           // var self = this;
 
           // setTimeout(function () {

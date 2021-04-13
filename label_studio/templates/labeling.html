@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
 {% block body %}
 
-<script src="static/js/Autointro.js"></script>
+
+{#<script src="static/js/AutointroPolygon.js"></script>#}
 <script src="static/js/lsf-sdk.js"></script>
 
 <!-- Editor -->
@@ -14,8 +15,13 @@
 <script>
   window.onload = function () {
     var task = {{ task_data | json | safe }};
+    var isAdmin = false;
+    {% if user.is_admin == True %}
+        isAdmin = true;
+    {% endif %}
+
     window.LSF_SDK = LSF_SDK("label-studio", `{{ label_config_line | safe }}`, task, false,
-                             null, false, null, "{{ batchid }}", 1);
+                             null, false, null, "{{ batchid }}", 1, isAdmin);
 
     {#var task = {{ task_data | json | safe }};#}
     {#window.LSF_SDK2 = LSF_SDK("label-studio2", `{{ label_config_line | safe }}`, task, false,#}

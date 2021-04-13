@@ -108,6 +108,8 @@ class Completion(db.Model):
     )
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
+    batch_id = db.Column(db.Integer)
+    was_skipped = db.Column(db.Boolean, default=False)
     data = db.Column(
         db.String(2000),
         nullable=False,
@@ -238,21 +240,4 @@ class BatchData(db.Model):
         nullable=False,
     )
 
-class TrainingTaskCompletions(db.Model):
-    __tablename__ = 'TrainingTaskCompletions'
-    id = db.Column(
-        db.Integer,
-        primary_key=True
-    )
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    task_id = db.Column(db.Integer, db.ForeignKey('TrainingTask.id'), nullable=False)
-    data = db.Column(
-        db.String(2000),
-        nullable=False,
-        unique=False
-    )
-
-    completed_at = db.Column(
-        db.BigInteger
-    )
 
