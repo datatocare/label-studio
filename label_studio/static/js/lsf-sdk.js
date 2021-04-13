@@ -451,13 +451,13 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
           if (res && res.id) {
               c.updatePersonalKey(res.id.toString());
               addHistory(ls, ls.task.id, res.id);
-              $('body').toast({
-            class: 'success',
-            title: 'Answer Response',
-            message: '<pre>' + "Your Answer is correct" + '</pre>',
-            displayTime: 3000,
-            position: 'bottom center'
-          });
+          //     $('body').toast({
+          //   class: 'success',
+          //   title: 'Answer Response',
+          //   message: '<pre>' + "Your Answer is correct" + '</pre>',
+          //   displayTime: 3000,
+          //   position: 'bottom center'
+          // });
           }
 
           if (task) {
