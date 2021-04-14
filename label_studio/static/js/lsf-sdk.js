@@ -124,7 +124,7 @@ const _loadTask = function(ls, url, completionID, reset) {
                     /**
                      * Add new data from received task
                      */
-                console.log(response);;
+                // console.log(response);;
                 response.data = JSON.stringify(response.data);
                 TempTaskData = response;
                 tmpLS = ls;
@@ -161,7 +161,6 @@ const _loadTask = function(ls, url, completionID, reset) {
 
                 // fix for broken old references in mst
                 cs.selected.setupHotKeys();
-                ls.setFlags({ isLoading: false });
                 // ls.onTaskLoad(ls, ls.task);
                 setTimeout(function () {
                     if (isAdmin){
@@ -179,7 +178,7 @@ const _loadTask = function(ls, url, completionID, reset) {
                         MyDOList(ls, ls.task);
                     }
                 }, (400));
-
+                ls.setFlags({ isLoading: false });
               // }
             })
         });
@@ -187,7 +186,15 @@ const _loadTask = function(ls, url, completionID, reset) {
         console.error("Failed to load next task ", err);
     }
 };
+
 function MyDOList(ls, task){
+    // if(task.dataObj.layout_id == 2) {
+    //     $('.Text_line__2JZG0').css("word-spacing", "50px");
+    // }
+    if(task.dataObj.layout_id == 8 && !ls.settings.showLabels) {
+        ls.settings.toggleShowLabels();
+    }
+
     if (task && task.dataObj.format_type == 1 ) {
         if (task.dataObj.completions != null){
             var Skipbtn = $('.ls-skip-btn');
@@ -461,7 +468,8 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
           }
 
           if (task) {
-            ls.setFlags({ isLoading: false });
+            // ls.setFlags({ isLoading: false });
+              console.log("task loaded");
                   // alert("Bilal 4");
           } else {
             loadNext(ls, true, 0, batch_id);
@@ -504,7 +512,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
       );
 
       req.then(function(httpres) {
-        ls.setFlags({ isLoading: false });
+        // ls.setFlags({ isLoading: false });
         // refresh task from server
         loadTask(ls, ls.task.id, ls.completionStore.selected.id, false);
       });
@@ -579,7 +587,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
           }
       } else {
         response.data = JSON.stringify(response.data);
-        ls.setFlags({isLoading: false});
+        // ls.setFlags({isLoading: false});
         ls.resetState();
         ls.assignTask(response);
         cTask = _convertTask(response);
@@ -602,6 +610,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
         if (c.id) cs.selectCompletion(c.id);
         // ls.onTaskLoad(ls, ls.task);
+          ls.setFlags({isLoading: false});
       }
       // alert("Bilal 3");
     }
