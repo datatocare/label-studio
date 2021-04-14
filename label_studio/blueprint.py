@@ -1524,6 +1524,7 @@ def create_app(label_studio_config=None):
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
     app.config['WTF_CSRF_ENABLED'] = False
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.url_map.strict_slashes = False
     app.label_studio = label_studio_config or config_from_file()
     login_manager.init_app(app)
