@@ -149,7 +149,7 @@ const _loadTask = function(ls, url, completionID, reset) {
                     c = {id: 1};
                 }
 
-                else if (ls.completionStore.completions.length > 0 && (response.format_type == 1 || response.format_type == 6) ) {
+                else if (ls.completionStore.completions.length > 0 && (response.format_type == 1 || response.format_type == 5) ) {
                     c = {id: completionID};
                 }
 
@@ -191,7 +191,7 @@ function MyDOList(ls, task){
     // if(task.dataObj.layout_id == 2) {
     //     $('.Text_line__2JZG0').css("word-spacing", "50px");
     // }
-    if(task.dataObj.layout_id == 8 && !ls.settings.showLabels) {
+    if((task.dataObj.layout_id == 8 || task.dataObj.layout_id == 5) && !ls.settings.showLabels) {
         ls.settings.toggleShowLabels();
     }
 
@@ -217,7 +217,7 @@ function MyDOList(ls, task){
             $('.ls-update-btn').hide();
             $('.ls-submit-btn').hide();
             ls.completionStore.selected.setEdit(false);
-            showDemo = Cookies.get("showInro" + task.dataObj.format_type.toString());
+            showDemo = Cookies.get("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString());
             if (showDemo == undefined) {
                 q = introJs().setOptions({
                     tooltipClass: 'customTooltip',doneLabel: "Let's Start",exitOnOverlayClick: false,exitOnEsc: false,showBullets: false,showStepNumbers: false,overlayOpacity: 0.5,disableInteraction: true,
@@ -227,7 +227,7 @@ function MyDOList(ls, task){
                     }]
                 });
                 q.start();
-                Cookies.set("showInro" + task.dataObj.format_type.toString(), true, { expires: 1 });
+                Cookies.set("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString(), true, { expires: 1 });
                 // Cookies.remove("example");
             }
         }
@@ -236,6 +236,8 @@ function MyDOList(ls, task){
             $.getScript('static/js/AutointroPolygon.js');
         } else if(task.dataObj.layout_id == 2) {
             $.getScript('static/js/AutointroRE.js');
+        } else if(task.dataObj.layout_id == 5) {
+            $.getScript('static/js/AutointroRectangle.js');
         } else if(task.dataObj.layout_id == 9) {
             $.getScript('static/js/AutointroImageClassification.js');
         }
@@ -280,7 +282,7 @@ function MyDOList(ls, task){
                      ls.submitCompletion();
             })
         });
-        showDemo = Cookies.get("showInro" + task.dataObj.format_type.toString());
+        showDemo = Cookies.get("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString());
         if (showDemo == undefined) {
             q = introJs().setOptions({
                 tooltipClass: 'customTooltip',doneLabel: "Let's Start",exitOnOverlayClick: false,exitOnEsc: false,showBullets: false,showStepNumbers: false,overlayOpacity: 0.5,disableInteraction: true,
@@ -289,7 +291,7 @@ function MyDOList(ls, task){
                     intro: 'Other User has done this task, Does it look okay to you? You can edit if not!'
                 }]
             });
-            Cookies.set("showInro" + task.dataObj.format_type.toString(), true, { expires: 1 });
+            Cookies.set("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString(), true, { expires: 1 });
             // Cookies.remove("example");
             q.start();
         }
