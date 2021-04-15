@@ -149,7 +149,7 @@ const _loadTask = function(ls, url, completionID, reset) {
                     c = {id: 1};
                 }
 
-                else if (ls.completionStore.completions.length > 0 && (response.format_type == 1 || response.format_type == 5) ) {
+                else if (ls.completionStore.completions.length > 0 && (response.format_type == 1 || response.format_type == 6) ) {
                     c = {id: completionID};
                 }
 
@@ -259,7 +259,7 @@ function MyDOList(ls, task){
                 tmpLS = ls;
                 reRenderTask(tmpLS);
             });
-    } else if (task && task.dataObj.format_type == 6) {
+    } else if (task && (task.dataObj.format_type == 6 )) {
         btndiv = $(".Controls_container__LTeAA")[0];
         $('.ls-update-btn').hide()// children().first().next().html('').append ("<span>Submit </span>");
         $('.ls-submit-btn').hide();
