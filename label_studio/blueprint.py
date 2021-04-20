@@ -235,6 +235,26 @@ def samples_time_series():
         mimetype='text/csv'
     )
 
+@blueprint.route('/<batchid>/reset')
+@flask_login.login_required
+@exception_handler_page
+def reset_completion_page(batchid):
+    user_id = flask_login.current_user.get_id()
+    batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
+    if batch_id is None:
+        return HttpResponse("<h1> Error: Invalid Batch Id</h1>" )
+    userScore = UserScore.query.filter_by(user_id=user_id, batch_id=batch_id).first()
+    if userScore is None:
+        return HttpResponse("<h1> Error: No completions </h1>" )
+    userScore.current_task_type = 1
+    db.session.add(userScore)
+    db.session.commit()
+
+    db.session.execute(
+        'Delete FROM completions where completions.user_id = :userID and completions.batch_id = :batchid ',
+        {'userID': user_id, 'batchid': batch_id})
+    return HttpResponse("<h1>Completions Reset for " + batchid + "done</h1>")
+
 
 @blueprint.route('/<batchid>')
 @blueprint.route('/', defaults={"batchid": '0'})
