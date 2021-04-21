@@ -295,7 +295,7 @@ function MyDOList(ls, task){
             startIntro(task.dataObj.completions[0].result, tmpLS);
             // c = {id: ls.completionStore.completions[1].id, editable: false};
             // ls.completionStore.selectCompletion(c.id);
-        }, (500));
+        }, (1000));
     } else if (task && task.dataObj.format_type == 3) {
         setTimeout(function () {
             btndiv = $(".Controls_container__LTeAA")[0];
