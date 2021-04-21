@@ -177,7 +177,7 @@ const _loadTask = function(ls, url, completionID, reset) {
                     } else {
                         MyDOList(ls, ls.task);
                     }
-                }, (400));
+                }, (200));
                 ls.setFlags({ isLoading: false });
               // }
             })
@@ -205,6 +205,7 @@ function MyDOList(ls, task){
                 Skipbtn.on('click', function () {
                     c = ls.completionStore.addCompletion({userGenerate: true});
                     ls.completionStore.selectCompletion(c.id);
+                    $(".Controls_container__LTeAA").hide();
                 });
                 btndiv = $(".Controls_container__LTeAA")[0];
                 var btn = $('<button type="button" class="ant-btn ant-btn-primary helpBtn"><span>Next</span></button>');
@@ -214,6 +215,7 @@ function MyDOList(ls, task){
                   ls.completionStore.selectCompletion(c.id);
                   // tmpLS = ls;
                   // tmpLS.onSubmitCompletion();
+                  $(".Controls_container__LTeAA").hide();
                   ls.submitCompletion();
                 });
                 $('.ls-update-btn').hide();
@@ -233,12 +235,56 @@ function MyDOList(ls, task){
                     // Cookies.remove("example");
                 }
             }
-        }, (50));
+        }, (250));
     } else if (task && task.dataObj.format_type == 2) {
         if (task.dataObj.layout_id == 8) {
             $.getScript('static/js/AutointroPolygon.js');
         } else if(task.dataObj.layout_id == 2) {
-            $.getScript('static/js/AutointroRE.js');
+            if (task.dataObj.batch_id == 5) {
+                result = task.dataObj.completions[0].result;
+                $("span:contains('" + result[0].value.labels[0] + "')")[0].click();
+                elemenq = document.querySelector('[class^="Text_line"]');
+                let range = new Range();
+                _text = result[0].value.text;
+                elem = elemenq.firstChild;
+                while(elem != null) {
+                    if (elem.textContent.indexOf(_text) != -1) {
+                        break
+                    } else {
+                        elem = elem.nextSibling;
+                    }
+                }
+                range.setStart(elem, elem.textContent.indexOf(_text));
+                range.setEnd(elem, elem.textContent.indexOf(_text) + _text.length);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+                var evt = document.createEvent("MouseEvents");
+                evt.initEvent("mouseup", true, true);
+                elemenq.dispatchEvent(evt);
+
+                $("span:contains('" + result[1].value.labels[0] + "')")[0].click();
+                elemenq = document.querySelector('[class^="Text_line"]');
+                let range1 = new Range();
+                _text = result[1].value.text;
+                elem1 = elemenq.firstChild;
+                while(elem1 != null) {
+                    if (elem1.textContent.indexOf(_text) != -1) {
+                        break
+                    } else {
+                        elem1 = elem1.nextSibling;
+                    }
+                }
+                range1.setStart(elem1, elem1.textContent.indexOf(_text));
+                range1.setEnd(elem1, elem1.textContent.indexOf(_text) + _text.length);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range1);
+                var evt1 = document.createEvent("MouseEvents");
+                evt1.initEvent("mouseup", true, true);
+                elemenq.dispatchEvent(evt1);
+                $.getScript('static/js/AutointroRE.js');
+            } else {
+                $.getScript('static/js/AutointroNE.js');
+            }
         } else if(task.dataObj.layout_id == 5) {
             $.getScript('static/js/AutointroRectangle.js');
         } else if(task.dataObj.layout_id == 9 || task.dataObj.layout_id == 12) {
@@ -249,8 +295,9 @@ function MyDOList(ls, task){
             startIntro(task.dataObj.completions[0].result, tmpLS);
             // c = {id: ls.completionStore.completions[1].id, editable: false};
             // ls.completionStore.selectCompletion(c.id);
-        }, (1 * 1000));
+        }, (500));
     } else if (task && task.dataObj.format_type == 3) {
+        setTimeout(function () {
             btndiv = $(".Controls_container__LTeAA")[0];
             if ($(".helpBtn")[0] != undefined) {
                 $(".helpBtn")[0].remove();
@@ -262,42 +309,50 @@ function MyDOList(ls, task){
                 tmpLS = ls;
                 reRenderTask(tmpLS);
             });
+        }, (200));
     } else if (task && (task.dataObj.format_type == 6 )) {
-        btndiv = $(".Controls_container__LTeAA")[0];
-        $('.ls-update-btn').hide()// children().first().next().html('').append ("<span>Submit </span>");
-        $('.ls-submit-btn').hide();
-        ls.completionStore.selected.setEdit(false);
-                                                                //green hash #52c41a
-        var btn = $('<button type="button" class="ant-btn ant-btn-secondary helpBtn" style="background: #52c41a; background-color: #52c41a; color: white"><span>Edit</span></button>');
-        var submitbutton = $('<button type="button" class="ant-btn ant-btn-primary mysubmitbtn"><span role="img" aria-label="check" class="anticon anticon-check"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 00-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"></path></svg></span><span>Submit </span></button>');
-        btndiv.append(submitbutton[0]);
-        btndiv.append(btn[0]);
-        submitbutton.on('click', function(){
-           ls.submitCompletion();
-        });
-        $(".helpBtn").on('click', function(){
-            ls.completionStore.selected.setEdit(true);
-            $(".helpBtn").hide();
-            $('.mysubmitbtn').hide();
-            var updatebtn = $('<button type="button" class="ant-btn ant-btn-primary myupdatebtn"><span role="img" aria-label="check-circle" class="anticon anticon-check-circle"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check-circle" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M699 353h-46.9c-10.2 0-19.9 4.9-25.9 13.3L469 584.3l-71.2-98.8c-6-8.3-15.6-13.3-25.9-13.3H325c-6.5 0-10.3 7.4-6.5 12.7l124.6 172.8a31.8 31.8 0 0051.7 0l210.6-292c3.9-5.3.1-12.7-6.4-12.7z"></path><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z"></path></svg></span><span>Update </span></button>');
-                btndiv.append(updatebtn[0]);
-                updatebtn.on('click', function (){
-                     ls.submitCompletion();
-            })
-        });
-        showDemo = Cookies.get("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString());
-        if (showDemo == undefined) {
-            q = introJs().setOptions({
-                tooltipClass: 'customTooltip',doneLabel: "Let's Start",exitOnOverlayClick: false,exitOnEsc: false,showBullets: false,showStepNumbers: false,overlayOpacity: 0.5,disableInteraction: true,
-                steps: [{
-                    title: 'Welcome 👋',
-                    intro: 'Other User has done this task, Does it look okay to you? You can edit if not!'
-                }]
+        setTimeout(function () {
+            btndiv = $(".Controls_container__LTeAA")[0];
+            $('.ls-update-btn').hide()// children().first().next().html('').append ("<span>Submit </span>");
+            $('.ls-submit-btn').hide();
+            ls.completionStore.selected.setEdit(false);
+           var Skipbtn = $('.ls-skip-btn');
+            Skipbtn.on('click', function () {
+                $(".Controls_container__LTeAA").hide();
+            });                                         //green hash #52c41a
+            var btn = $('<button type="button" class="ant-btn ant-btn-secondary helpBtn" style="background: #52c41a; background-color: #52c41a; color: white"><span>Edit</span></button>');
+            var submitbutton = $('<button type="button" class="ant-btn ant-btn-primary mysubmitbtn"><span role="img" aria-label="check" class="anticon anticon-check"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 00-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"></path></svg></span><span>Submit </span></button>');
+            btndiv.append(submitbutton[0]);
+            btndiv.append(btn[0]);
+            submitbutton.on('click', function(){
+               ls.submitCompletion();
+                $(".Controls_container__LTeAA").hide();
             });
-            Cookies.set("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString(), true, { expires: 1 });
-            // Cookies.remove("example");
-            q.start();
-        }
+            $(".helpBtn").on('click', function(){
+                ls.completionStore.selected.setEdit(true);
+                $(".helpBtn").hide();
+                $('.mysubmitbtn').hide();
+                var updatebtn = $('<button type="button" class="ant-btn ant-btn-primary myupdatebtn"><span role="img" aria-label="check-circle" class="anticon anticon-check-circle"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check-circle" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M699 353h-46.9c-10.2 0-19.9 4.9-25.9 13.3L469 584.3l-71.2-98.8c-6-8.3-15.6-13.3-25.9-13.3H325c-6.5 0-10.3 7.4-6.5 12.7l124.6 172.8a31.8 31.8 0 0051.7 0l210.6-292c3.9-5.3.1-12.7-6.4-12.7z"></path><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z"></path></svg></span><span>Update </span></button>');
+                    btndiv.append(updatebtn[0]);
+                    updatebtn.on('click', function (){
+                        $(".Controls_container__LTeAA").hide();
+                         ls.submitCompletion();
+                })
+            });
+            showDemo = Cookies.get("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString());
+            if (showDemo == undefined) {
+                q = introJs().setOptions({
+                    tooltipClass: 'customTooltip',doneLabel: "Let's Start",exitOnOverlayClick: false,exitOnEsc: false,showBullets: false,showStepNumbers: false,overlayOpacity: 0.5,disableInteraction: true,
+                    steps: [{
+                        title: 'Welcome 👋',
+                        intro: 'Other User has done this task, Does it look okay to you? You can edit if not!'
+                    }]
+                });
+                Cookies.set("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString(), true, { expires: 1 });
+                // Cookies.remove("example");
+                q.start();
+            }
+        }, (300));
     }
 }
 
@@ -314,7 +369,9 @@ function reRenderTask(ls){
         cs.selected.setupHotKeys();
         btndiv = $(".Controls_container__LTeAA")[0];
         $(".helpBtn").children().first().html('').append ("<span>Back to Task </span>");
-
+        parent = $(".ls-skip-btn").parent();
+        parent.children().eq(0).before(parent.children().last());
+        parent.children().eq(0).before(parent.children().last());
         $('.ls-skip-btn').hide();
         $('.ls-update-btn').hide();
         $('.ls-submit-btn').hide();
@@ -325,7 +382,8 @@ function reRenderTask(ls){
         cs.selected.setupHotKeys();
         $(".helpBtn").children().first().html('').append ("<span>See Answer </span>");
         parent = $(".helpBtn").parent();
-        parent.children().eq(1).before(parent.children().last());
+        parent.children().eq(0).before(parent.children().last());
+        parent.children().eq(0).before(parent.children().last());
         $('.ls-skip-btn').show();
         $('.ls-update-btn').show();
         $('.ls-submit-btn').show();
