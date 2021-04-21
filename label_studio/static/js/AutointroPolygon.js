@@ -95,6 +95,7 @@ function exitCall(ls){
     Skipbtn.on('click', function () {
         c = ls.completionStore.addCompletion({userGenerate: true});
         cs.selectCompletion(c.id);
+        $(".Controls_container__LTeAA").hide();
     });
 
     btndiv = $(".Controls_container__LTeAA")[0];
@@ -104,6 +105,7 @@ function exitCall(ls){
       c = ls.completionStore.addCompletion({userGenerate: true});
       ls.completionStore.selectCompletion(c.id);
       ls.submitCompletion();
+      $(".Controls_container__LTeAA").hide();
     });
 
 }

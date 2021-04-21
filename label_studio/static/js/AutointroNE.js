@@ -17,10 +17,7 @@ function startIntro(_result, _ls) {
     });
     q.oncomplete(function () {
         didComplete = true;
-        // nextStepForTag(_result,0);
-        idtoLabelMap[result[0].id] = result[0].value.text;
-        idtoLabelMap[result[1].id] = result[1].value.text;
-        nextStepForRelation(_result, 2);
+        nextStepForTag(_result,0);
     }).onexit(function (targetElement) {
         if (didComplete) {
             didComplete = false;
@@ -95,7 +92,6 @@ function nextStepForTag(result, stepNumber) {
                 }).start();
 
                 setTimeout(function () {
-                    $("span:contains('" + result[stepNumber].value.labels[0] + "')")[0].click();
                     elemenq = document.querySelector('[class^="Text_line"]');
                     let range = new Range();
                     _text = result[stepNumber].value.text;
