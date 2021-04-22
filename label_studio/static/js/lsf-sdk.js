@@ -237,64 +237,71 @@ function MyDOList(ls, task){
             }
         }, (250));
     } else if (task && task.dataObj.format_type == 2) {
-        if (task.dataObj.layout_id == 8) {
-            $.getScript('static/js/AutointroPolygon.js');
-        } else if(task.dataObj.layout_id == 2) {
-            if (task.dataObj.batch_id == 5) {
-                result = task.dataObj.completions[0].result;
-                $("span:contains('" + result[0].value.labels[0] + "')")[0].click();
-                elemenq = document.querySelector('[class^="Text_line"]');
-                let range = new Range();
-                _text = result[0].value.text;
-                elem = elemenq.firstChild;
-                while(elem != null) {
-                    if (elem.textContent.indexOf(_text) != -1) {
-                        break
-                    } else {
-                        elem = elem.nextSibling;
-                    }
-                }
-                range.setStart(elem, elem.textContent.indexOf(_text));
-                range.setEnd(elem, elem.textContent.indexOf(_text) + _text.length);
-                window.getSelection().removeAllRanges();
-                window.getSelection().addRange(range);
-                var evt = document.createEvent("MouseEvents");
-                evt.initEvent("mouseup", true, true);
-                elemenq.dispatchEvent(evt);
-
-                $("span:contains('" + result[1].value.labels[0] + "')")[0].click();
-                elemenq = document.querySelector('[class^="Text_line"]');
-                let range1 = new Range();
-                _text = result[1].value.text;
-                elem1 = elemenq.firstChild;
-                while(elem1 != null) {
-                    if (elem1.textContent.indexOf(_text) != -1) {
-                        break
-                    } else {
-                        elem1 = elem1.nextSibling;
-                    }
-                }
-                range1.setStart(elem1, elem1.textContent.indexOf(_text));
-                range1.setEnd(elem1, elem1.textContent.indexOf(_text) + _text.length);
-                window.getSelection().removeAllRanges();
-                window.getSelection().addRange(range1);
-                var evt1 = document.createEvent("MouseEvents");
-                evt1.initEvent("mouseup", true, true);
-                elemenq.dispatchEvent(evt1);
-                $.getScript('static/js/AutointroRE.js');
-            } else {
-                $.getScript('static/js/AutointroNE.js');
-            }
-        } else if(task.dataObj.layout_id == 5) {
-            $.getScript('static/js/AutointroRectangle.js');
-        } else if(task.dataObj.layout_id == 9 || task.dataObj.layout_id == 12) {
-            $.getScript('static/js/AutointroImageClassification.js');
-        }
         setTimeout(function () {
             tmpLS = ls;
-            startIntro(task.dataObj.completions[0].result, tmpLS);
-            // c = {id: ls.completionStore.completions[1].id, editable: false};
-            // ls.completionStore.selectCompletion(c.id);
+            if (task.dataObj.layout_id == 8) {
+                // $.getScript('static/js/AutointroPolygon.js');
+                startIntroPolygon(task.dataObj.completions[0].result, tmpLS);
+            } else if(task.dataObj.layout_id == 2) {
+                if (task.dataObj.batch_id == 5) {
+                    result = task.dataObj.completions[0].result;
+                    $("span:contains('" + result[0].value.labels[0] + "')")[0].click();
+                    elemenq = document.querySelector('[class^="Text_line"]');
+                    let range = new Range();
+                    _text = result[0].value.text;
+                    elem = elemenq.firstChild;
+                    while(elem != null) {
+                        if (elem.textContent.indexOf(_text) != -1) {
+                            break
+                        } else {
+                            elem = elem.nextSibling;
+                        }
+                    }
+                    range.setStart(elem, elem.textContent.indexOf(_text));
+                    range.setEnd(elem, elem.textContent.indexOf(_text) + _text.length);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                    var evt = document.createEvent("MouseEvents");
+                    evt.initEvent("mouseup", true, true);
+                    elemenq.dispatchEvent(evt);
+
+                    $("span:contains('" + result[1].value.labels[0] + "')")[0].click();
+                    elemenq = document.querySelector('[class^="Text_line"]');
+                    let range1 = new Range();
+                    _text = result[1].value.text;
+                    elem1 = elemenq.firstChild;
+                    while(elem1 != null) {
+                        if (elem1.textContent.indexOf(_text) != -1) {
+                            break
+                        } else {
+                            elem1 = elem1.nextSibling;
+                        }
+                    }
+                    range1.setStart(elem1, elem1.textContent.indexOf(_text));
+                    range1.setEnd(elem1, elem1.textContent.indexOf(_text) + _text.length);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range1);
+                    var evt1 = document.createEvent("MouseEvents");
+                    evt1.initEvent("mouseup", true, true);
+                    elemenq.dispatchEvent(evt1);
+                    // $.getScript('static/js/AutointroRE.js');
+                    startIntroRE(task.dataObj.completions[0].result, tmpLS);
+                } else {
+                    $.getScript('static/js/AutointroNE.js');
+                    startIntroNE(task.dataObj.completions[0].result, tmpLS);
+                }
+            } else if(task.dataObj.layout_id == 5) {
+                $.getScript('static/js/AutointroRectangle.js');
+                startIntroRectangle(task.dataObj.completions[0].result, tmpLS);
+            } else if(task.dataObj.layout_id == 9 || task.dataObj.layout_id == 12) {
+                $.getScript('static/js/AutointroImageClassification.js');
+                startIntroImgCls(task.dataObj.completions[0].result, tmpLS);
+            }
+        // setTimeout(function () {
+        //     tmpLS = ls;
+        //     startIntro(task.dataObj.completions[0].result, tmpLS);
+        //     // c = {id: ls.completionStore.completions[1].id, editable: false};
+        //     // ls.completionStore.selectCompletion(c.id);
         }, (1000));
     } else if (task && task.dataObj.format_type == 3) {
         setTimeout(function () {
@@ -309,7 +316,7 @@ function MyDOList(ls, task){
                 tmpLS = ls;
                 reRenderTask(tmpLS);
             });
-        }, (200));
+        }, (300));
     } else if (task && (task.dataObj.format_type == 6 )) {
         setTimeout(function () {
             btndiv = $(".Controls_container__LTeAA")[0];
