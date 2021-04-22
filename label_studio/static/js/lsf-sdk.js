@@ -521,6 +521,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
     onSubmitCompletion: function(ls, c) {
       ls.setFlags({ isLoading: true });
+      $(".Controls_container__LTeAA").hide();
       const req = Requests.poster(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/`, _prepData(c));
 
       req.then(function(httpres) {
@@ -574,6 +575,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
     },
 
     onUpdateCompletion: function(ls, c) {
+        $(".Controls_container__LTeAA").hide();
       ls.setFlags({ isLoading: true });
 
       const req = Requests.patch(
@@ -599,6 +601,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
     onSkipTask: function(ls) {
       ls.setFlags({ loading: true });
+      $(".Controls_container__LTeAA").hide();
       var c = ls.completionStore.selected;
       var completion = _prepData(c, false);
 
