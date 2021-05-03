@@ -18,6 +18,7 @@ const API_URL = {
 var lastId;
 var tmpLS;
 var isAdmin;
+var TaskdataObj;
 
 const Requests = (function(window) {
   const handleResponse = res => {
@@ -191,8 +192,62 @@ function MyDOList(ls, task){
     // if(task.dataObj.layout_id == 2) {
     //     $('.Text_line__2JZG0').css("word-spacing", "50px");
     // }
+    TaskdataObj = task.dataObj;
     if((task.dataObj.layout_id == 8 || task.dataObj.layout_id == 5) && !ls.settings.showLabels) {
         ls.settings.toggleShowLabels();
+    }
+
+    if ( task.dataObj.layout_id == 2 && task.dataObj.batch_id == 5 ){
+       if (task.dataObj.format_type != 1 && task.dataObj.format_type != 6) {
+           result = task.dataObj.completions[0].result;
+           $("span:contains('" + result[0].value.labels[0] + "')")[0].click();
+           elemenq = document.querySelector('[class^="Text_line"]');
+           let range = new Range();
+           _text = result[0].value.text;
+           elem = elemenq.firstChild;
+           while (elem != null) {
+               if (elem.textContent.indexOf(_text) != -1) {
+                   break
+               } else {
+                   elem = elem.nextSibling;
+               }
+           }
+           range.setStart(elem, elem.textContent.indexOf(_text));
+           range.setEnd(elem, elem.textContent.indexOf(_text) + _text.length);
+           window.getSelection().removeAllRanges();
+           window.getSelection().addRange(range);
+           var evt = document.createEvent("MouseEvents");
+           evt.initEvent("mouseup", true, true);
+           elemenq.dispatchEvent(evt);
+
+           $("span:contains('" + result[1].value.labels[0] + "')")[0].click();
+           elemenq = document.querySelector('[class^="Text_line"]');
+           let range1 = new Range();
+           _text = result[1].value.text;
+           elem1 = elemenq.firstChild;
+           while (elem1 != null) {
+               if (elem1.textContent.indexOf(_text) != -1) {
+                   if (elem1.firstChild != null) {
+                       elem1 = elem1.firstChild;
+                   }
+                   break
+               } else {
+                   elem1 = elem1.nextSibling;
+               }
+           }
+           range1.setStart(elem1, elem1.textContent.indexOf(_text));
+           range1.setEnd(elem1, elem1.textContent.indexOf(_text) + _text.length);
+           window.getSelection().removeAllRanges();
+           window.getSelection().addRange(range1);
+           var evt1 = document.createEvent("MouseEvents");
+           evt1.initEvent("mouseup", true, true);
+           elemenq.dispatchEvent(evt1);
+           // $.getScript('static/js/AutointroRE.js');
+           $($("span:contains('" + task.dataObj.completions[0].result[0].value.labels[0] + "')")[0].parentElement).children().hide();
+       } else {
+           $($("span:contains('" + task.dataObj.completions[0].result[0].value.labels[0] + "')")[0].parentElement).children().hide();
+           generateOnlyMouseoverEvent(document.getElementsByClassName("Relations_item__2qMzb")[0]);
+       }
     }
 
     if (task && task.dataObj.format_type == 1 ) {
@@ -205,17 +260,29 @@ function MyDOList(ls, task){
                 Skipbtn.on('click', function () {
                     c = ls.completionStore.addCompletion({userGenerate: true});
                     ls.completionStore.selectCompletion(c.id);
-                    $(".Controls_container__LTeAA").hide();
+                    // $(".Controls_container__LTeAA").hide();
+                    // $(".Controls_container__LTeAA").find("*").attr("disabled", true)
+                    $(".Controls_container__LTeAA").children().each(function(index,element){
+                        if (index != 0) {
+                            $(element).hide();
+                        }
+                    });
                 });
                 btndiv = $(".Controls_container__LTeAA")[0];
-                var btn = $('<button type="button" class="ant-btn ant-btn-primary helpBtn"><span>Next</span></button>');
+                var btn = $('<button type="button" class="ant-btn ant-btn-primary helpBtn1"><span>Next</span></button>');
                 btndiv.append(btn[0]);
-                $('.helpBtn').on('click', function () {
+                $('.helpBtn1').on('click', function () {
                   c = ls.completionStore.addCompletion({userGenerate: true});
                   ls.completionStore.selectCompletion(c.id);
                   // tmpLS = ls;
                   // tmpLS.onSubmitCompletion();
-                  $(".Controls_container__LTeAA").hide();
+                  // $(".Controls_container__LTeAA").hide();
+                  //   $(".Controls_container__LTeAA").find("*").attr("disabled", true)
+                $(".Controls_container__LTeAA").children().each(function(index,element){
+                    if (index != 0) {
+                        $(element).hide();
+                    }
+                });
                   ls.submitCompletion();
                 });
                 $('.ls-update-btn').hide();
@@ -244,57 +311,21 @@ function MyDOList(ls, task){
                 startIntroPolygon(task.dataObj.completions[0].result, tmpLS);
             } else if(task.dataObj.layout_id == 2) {
                 if (task.dataObj.batch_id == 5) {
-                    result = task.dataObj.completions[0].result;
-                    $("span:contains('" + result[0].value.labels[0] + "')")[0].click();
-                    elemenq = document.querySelector('[class^="Text_line"]');
-                    let range = new Range();
-                    _text = result[0].value.text;
-                    elem = elemenq.firstChild;
-                    while(elem != null) {
-                        if (elem.textContent.indexOf(_text) != -1) {
-                            break
-                        } else {
-                            elem = elem.nextSibling;
-                        }
-                    }
-                    range.setStart(elem, elem.textContent.indexOf(_text));
-                    range.setEnd(elem, elem.textContent.indexOf(_text) + _text.length);
-                    window.getSelection().removeAllRanges();
-                    window.getSelection().addRange(range);
-                    var evt = document.createEvent("MouseEvents");
-                    evt.initEvent("mouseup", true, true);
-                    elemenq.dispatchEvent(evt);
 
-                    $("span:contains('" + result[1].value.labels[0] + "')")[0].click();
-                    elemenq = document.querySelector('[class^="Text_line"]');
-                    let range1 = new Range();
-                    _text = result[1].value.text;
-                    elem1 = elemenq.firstChild;
-                    while(elem1 != null) {
-                        if (elem1.textContent.indexOf(_text) != -1) {
-                            break
-                        } else {
-                            elem1 = elem1.nextSibling;
-                        }
-                    }
-                    range1.setStart(elem1, elem1.textContent.indexOf(_text));
-                    range1.setEnd(elem1, elem1.textContent.indexOf(_text) + _text.length);
-                    window.getSelection().removeAllRanges();
-                    window.getSelection().addRange(range1);
-                    var evt1 = document.createEvent("MouseEvents");
-                    evt1.initEvent("mouseup", true, true);
-                    elemenq.dispatchEvent(evt1);
-                    // $.getScript('static/js/AutointroRE.js');
+                    // $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).find("*").attr("disabled", true);
+                    // $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).children().each(function(index,element){
+                    //     $(element).attr("disabled", true);
+                    // });
                     startIntroRE(task.dataObj.completions[0].result, tmpLS);
                 } else {
-                    $.getScript('static/js/AutointroNE.js');
+                    // $.getScript('static/js/AutointroNE.js');
                     startIntroNE(task.dataObj.completions[0].result, tmpLS);
                 }
             } else if(task.dataObj.layout_id == 5) {
-                $.getScript('static/js/AutointroRectangle.js');
+                // $.getScript('static/js/AutointroRectangle.js');
                 startIntroRectangle(task.dataObj.completions[0].result, tmpLS);
             } else if(task.dataObj.layout_id == 9 || task.dataObj.layout_id == 12) {
-                $.getScript('static/js/AutointroImageClassification.js');
+                // $.getScript('static/js/AutointroImageClassification.js');
                 startIntroImgCls(task.dataObj.completions[0].result, tmpLS);
             }
         // setTimeout(function () {
@@ -325,7 +356,13 @@ function MyDOList(ls, task){
             ls.completionStore.selected.setEdit(false);
            var Skipbtn = $('.ls-skip-btn');
             Skipbtn.on('click', function () {
-                $(".Controls_container__LTeAA").hide();
+                // $(".Controls_container__LTeAA").hide();
+                // $(".Controls_container__LTeAA").find("*").attr("disabled", true);
+                $(".Controls_container__LTeAA").children().each(function(index,element){
+                    if (index != 0) {
+                        $(element).hide();
+                    }
+                });
             });                                         //green hash #52c41a
             var btn = $('<button type="button" class="ant-btn ant-btn-secondary helpBtn" style="background: #52c41a; background-color: #52c41a; color: white"><span>Edit</span></button>');
             var submitbutton = $('<button type="button" class="ant-btn ant-btn-primary mysubmitbtn"><span role="img" aria-label="check" class="anticon anticon-check"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 00-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"></path></svg></span><span>Submit </span></button>');
@@ -333,7 +370,13 @@ function MyDOList(ls, task){
             btndiv.append(btn[0]);
             submitbutton.on('click', function(){
                ls.submitCompletion();
-                $(".Controls_container__LTeAA").hide();
+                // $(".Controls_container__LTeAA").hide();
+                // $(".Controls_container__LTeAA").find("*").attr("disabled", true)
+                $(".Controls_container__LTeAA").children().each(function(index,element){
+                    if (index != 0) {
+                        $(element).hide();
+                    }
+                });
             });
             $(".helpBtn").on('click', function(){
                 ls.completionStore.selected.setEdit(true);
@@ -342,7 +385,13 @@ function MyDOList(ls, task){
                 var updatebtn = $('<button type="button" class="ant-btn ant-btn-primary myupdatebtn"><span role="img" aria-label="check-circle" class="anticon anticon-check-circle"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check-circle" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M699 353h-46.9c-10.2 0-19.9 4.9-25.9 13.3L469 584.3l-71.2-98.8c-6-8.3-15.6-13.3-25.9-13.3H325c-6.5 0-10.3 7.4-6.5 12.7l124.6 172.8a31.8 31.8 0 0051.7 0l210.6-292c3.9-5.3.1-12.7-6.4-12.7z"></path><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z"></path></svg></span><span>Update </span></button>');
                     btndiv.append(updatebtn[0]);
                     updatebtn.on('click', function (){
-                        $(".Controls_container__LTeAA").hide();
+                        // $(".Controls_container__LTeAA").hide();
+                        // $(".Controls_container__LTeAA").find("*").attr("disabled", true)
+                        $(".Controls_container__LTeAA").children().each(function(index,element){
+                            if (index != 0) {
+                                $(element).hide();
+                            }
+                        });
                          ls.submitCompletion();
                 })
             });
@@ -373,7 +422,11 @@ function reRenderTask(ls){
     if (ls.completionStore.selected.id === cs.completions[0].id){
         c = {id: cs.completions[1].id, editable: false};
         cs.selectCompletion(c.id);
-        cs.selected.setupHotKeys();
+        if (TaskdataObj.layout_id == 2 && TaskdataObj.batch_id == 5) {
+            $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).children().hide();
+            generateOnlyMouseoverEvent(document.getElementsByClassName("Relations_item__2qMzb")[0]);
+        }
+    cs.selected.setupHotKeys();
         btndiv = $(".Controls_container__LTeAA")[0];
         $(".helpBtn").children().first().html('').append ("<span>Back to Task </span>");
         parent = $(".ls-skip-btn").parent();
@@ -386,9 +439,16 @@ function reRenderTask(ls){
     } else {
         c = {id: cs.completions[0].id, editable: false};
         cs.selectCompletion(c.id);
+        if (TaskdataObj.layout_id == 2 && TaskdataObj.batch_id == 5) {
+            $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).children().hide();
+        }
         cs.selected.setupHotKeys();
         $(".helpBtn").children().first().html('').append ("<span>See Answer </span>");
         parent = $(".helpBtn").parent();
+        var evt = document.createEvent("MouseEvents");
+        evt.initEvent("click", true, false);
+        $("body")[0].dispatchEvent(evt);
+
         parent.children().eq(0).before(parent.children().last());
         parent.children().eq(0).before(parent.children().last());
         $('.ls-skip-btn').show();
@@ -521,7 +581,14 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
     onSubmitCompletion: function(ls, c) {
       ls.setFlags({ isLoading: true });
-      $(".Controls_container__LTeAA").hide();
+      // $(".Controls_container__LTeAA").hide();
+      //   $(".Controls_container__LTeAA").find("*").attr("disabled", true)
+                $(".Controls_container__LTeAA").children().each(function(index,element){
+                    if (index != 0) {
+                        $(element).hide();
+                    }
+                });
+
       const req = Requests.poster(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/`, _prepData(c));
 
       req.then(function(httpres) {
@@ -575,7 +642,13 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
     },
 
     onUpdateCompletion: function(ls, c) {
-        $(".Controls_container__LTeAA").hide();
+        // $(".Controls_container__LTeAA").hide();
+        // $(".Controls_container__LTeAA").find("*").attr("disabled", true)
+                $(".Controls_container__LTeAA").children().each(function(index,element){
+                    if (index != 0) {
+                        $(element).hide();
+                    }
+                });
       ls.setFlags({ isLoading: true });
 
       const req = Requests.patch(
@@ -601,7 +674,13 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
     onSkipTask: function(ls) {
       ls.setFlags({ loading: true });
-      $(".Controls_container__LTeAA").hide();
+      // $(".Controls_container__LTeAA").hide();
+      //   $(".Controls_container__LTeAA").find("*").attr("disabled", true)
+                $(".Controls_container__LTeAA").children().each(function(index,element){
+                    if (index != 0) {
+                        $(element).hide();
+                    }
+                });
       var c = ls.completionStore.selected;
       var completion = _prepData(c, false);
 

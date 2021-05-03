@@ -253,6 +253,7 @@ def reset_completion_page(batchid):
     db.session.execute(
         'Delete FROM completions where completions.user_id = :userID and completions.batch_id = :batchid ',
         {'userID': user_id, 'batchid': batch_id})
+    db.session.commit()
     return HttpResponse("<h1>Completions Reset for " + batchid + "done</h1>")
 
 
@@ -1626,7 +1627,7 @@ def login():
     # Bypass if user is logged in
     if flask.request.method == 'GET':
         if flask_login.current_user.is_authenticated:
-            return redirect(flask.url_for('labeling_page'))
+            return redirect(flask.url_for('label_studio.labeling_page'))
         else:
             return flask.render_template('LoginForm.html')
     else:

@@ -95,13 +95,16 @@ function nextStepForTag(result, stepNumber) {
                 }).start();
 
                 setTimeout(function () {
-                    $("span:contains('" + result[stepNumber].value.labels[0] + "')")[0].click();
                     elemenq = document.querySelector('[class^="Text_line"]');
                     let range = new Range();
                     _text = result[stepNumber].value.text;
                     elem = elemenq.firstChild;
                     while(elem != null) {
+
                         if (elem.textContent.indexOf(_text) != -1) {
+                            if (elem.firstChild != null) {
+                               elem = elem1.firstChild;
+                            }
                             break
                         } else {
                             elem = elem.nextSibling;
@@ -133,9 +136,9 @@ function nextStepForTag(result, stepNumber) {
 
 function nextStepForRelation(result, stepNumber) {
     dataLabel1 = idtoLabelMap[result[stepNumber].from_id]
-    dataLabelElement1 = $( "span:contains('"+ dataLabel1 + "')")[1]
+    dataLabelElement1 = $( "span:contains('"+ dataLabel1 + "')")[1];
     dataLabel2 = idtoLabelMap[result[stepNumber].to_id];
-    dataLabelElement2 = $( "span:contains('"+ dataLabel2 + "')")[1]
+    dataLabelElement2 = $( "span:contains('"+ dataLabel2 + "')")[1];
     setTimeout(function () {
         introJs().setOptions({
             doneLabel: "Next",scrollToElement: true, exitOnOverlayClick: false,exitOnEsc: false,showBullets: false,showStepNumbers: false,overlayOpacity: 0.5,disableInteraction: true,
@@ -406,6 +409,12 @@ function exitCall(ls){
     let cs = ls.completionStore;
     let c = {id: ls.completionStore.completions[1].id, editable: false};
     if (c.id) cs.selectCompletion(c.id);
+    if (TaskdataObj.layout_id == 2 && TaskdataObj.batch_id == 5) {
+        $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).children().hide();
+        // $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).find("*").off("click");
+        generateOnlyMouseoverEvent(document.getElementsByClassName("Relations_item__2qMzb")[0]);
+    }
+
     var Skipbtn = $('.ls-skip-btn').children().first();
     Skipbtn.html('').append("<span>Show me more</span>");
     $('.ls-update-btn').hide();
@@ -413,17 +422,19 @@ function exitCall(ls){
     Skipbtn.on('click', function () {
         c = ls.completionStore.addCompletion({userGenerate: true});
         cs.selectCompletion(c.id);
-        $(".Controls_container__LTeAA").hide();
+        // $($(".Controls_container__LTeAA").children).remove();
+        $(".Controls_container__LTeAA").find("*").attr("disabled", true)
     });
 
     btndiv = $(".Controls_container__LTeAA")[0];
-    var btn = $('<button type="button" class="ant-btn ant-btn-primary helpBtn"><span>Next</span></button>');
+    var btn = $('<button type="button" class="ant-btn ant-btn-primary helpBtn1"><span>Next</span></button>');
     btndiv.append(btn[0]);
-    $('.helpBtn').on('click', function () {
+    $('.helpBtn1').on('click', function () {
       c = ls.completionStore.addCompletion({userGenerate: true});
       ls.completionStore.selectCompletion(c.id);
       ls.submitCompletion();
-      $(".Controls_container__LTeAA").hide();
+      // $(".Controls_container__LTeAA").hide();
+        $(".Controls_container__LTeAA").find("*").attr("disabled", true)
     });
 
 }
