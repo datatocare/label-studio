@@ -588,8 +588,22 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
                         $(element).hide();
                     }
                 });
+        // if (c.serializeCompletion().length == 0 &&  TaskdataObj.format_type == 3){
+        //     $('body').toast({
+        //     class: 'error',
+        //     title: 'Empty Response',
+        //     message: '<pre>' + "Response can not be empty!" + '</pre>',
+        //     displayTime: 3000,
+        //     position: 'bottom center'
+        //   });
+        //     ls.setFlags({ isLoading: false });
+        //     setTimeout(function () {
+        //         MyDOList(tmpLS, tmpLS.task);
+        //     }, (200));
+        //     return false ;
+        // }
 
-      const req = Requests.poster(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/`, _prepData(c));
+      const req = Requests.poster(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/`, _prepData(c) );
 
       req.then(function(httpres) {
         httpres.json().then(function(res) {
@@ -603,10 +617,19 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
           //   displayTime: 3000,
           //   position: 'bottom center'
           // });
+          } else if (res && res.IsEmpty) {
+              $('body').toast({
+            class: 'error',
+            title: 'Empty Response',
+            message: '<pre>' + "Response can not be empty!" + '</pre>',
+            displayTime: 3000,
+            position: 'bottom center'
+          });
+
           }
 
           if (task) {
-            // ls.setFlags({ isLoading: false });
+            ls.setFlags({ isLoading: false });
               console.log("task loaded");
                   // alert("Bilal 4");
           } else {

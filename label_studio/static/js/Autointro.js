@@ -647,13 +647,8 @@ function startIntroImgCls(_result, _ls) {
                 }]
             }).oncomplete(function () {
                 didComplete = true;
-                FinishStep(ls);
             }).onexit(function () {
-                if (didComplete) {
-                    didComplete = false;
-                } else {
-                    exitCall(ls);
-                }
+                exitCall(ls);
             }).onafterchange(function (el) {
                 afterChangeCall(q);
             }).start();
