@@ -484,7 +484,7 @@ def batches_page():
     """ On-boarding page
     """
 
-    is_admin = flask_login.current_user.__getattr__("is_admin")
+    # is_admin = flask_login.current_user.__getattr__("is_admin")
     batches = db.session.execute("select * from BatchData")
     batches = batches.fetchall()
 
@@ -495,6 +495,23 @@ def batches_page():
         config=g.project.config,
         user=flask_login.current_user
     )
+
+@blueprint.route('/api/PROJECT/batch/delTasks', methods=['POST'])
+@flask_login.login_required
+@exception_handler_page
+def del_Batch_tasks():
+
+
+    if request.method == 'POST':
+        batchid = request.values.get('batchid', '-1')
+        if batchid == '-1':
+            return make_response(json.dumps({'Error': True, "msg": "Invalid Batch ID"}), 201)
+
+        db.session.execute("delete from task where batch_id = :batchid",
+                {'batchid': batchid})
+        db.session.commit()
+        return make_response(json.dumps({'Error': False, "msg": "Tasks Deleted"}), 201)
+
 
 @blueprint.route('/tasks', methods=['GET', 'POST'])
 @flask_login.login_required
@@ -1325,7 +1342,7 @@ def api_tasks_completions(task_id):
             elif userScore.current_task_type in (4, 5, 6) and len(completion['result']) == 0:
                 # originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
                 # data = json.loads(originalCompletion.data)
-                return make_response(json.dumps({'IsEmpty': True, "msg": "Answer response can not be empty"}), 201)
+                    return make_response(json.dumps({'IsEmpty': True, "msg": "Answer response can not be empty"}), 201)
             # elif userScore.current_task_type == 6:
                 # originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
                 # data = json.loads(originalCompletion.data)
