@@ -253,6 +253,7 @@ def reset_completion_page(batchid):
     db.session.execute(
         'Delete FROM completions where completions.user_id = :userID and completions.batch_id = :batchid ',
         {'userID': user_id, 'batchid': batch_id})
+    db.session.commit()
     return HttpResponse("<h1>Completions Reset for " + batchid + "done</h1>")
 
 
@@ -1316,9 +1317,22 @@ def api_tasks_completions(task_id):
         else:
             completion.pop('skipped', None)  # deprecated
             completion.pop('was_cancelled', None)
+            if userScore.current_task_type == 3 or (userScore.current_task_type in (4, 5, 6) and batch_id == 5):
+                originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
+                data = json.loads(originalCompletion.data)
+                if len(completion['result']) == 0 or len(data['result']) > len(completion['result']):
+                    return make_response(json.dumps({'IsEmpty': True, "msg": "Plz complete all tasks"}), 201)
+            elif userScore.current_task_type in (4, 5, 6) and len(completion['result']) == 0:
+                # originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
+                # data = json.loads(originalCompletion.data)
+                return make_response(json.dumps({'IsEmpty': True, "msg": "Answer response can not be empty"}), 201)
+            # elif userScore.current_task_type == 6:
+                # originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
+                # data = json.loads(originalCompletion.data)
+                # return make_response(json.dumps({'IsEmpty': True, "msg":""}), 201)
             # userScore = UserScore.query.filter_by(user_id=user, batch_id=batch_id).first()
 
-        completion["user"] =  user
+        completion["user"] = user
         completion_id = g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled)
         # checkscore(completion)
 
@@ -1332,11 +1346,11 @@ def api_tasks_completions(task_id):
                 elif userScore.current_task_type == 2:
                     userScore.current_task_type = 3
                 elif userScore.current_task_type == 3:
-                    numOfCompletions = Completion.query.join(Task, Task.id==Completion.task_id).filter(Completion.batch_id==batch_id, Completion.user_id==user, Completion.was_skipped==False, Task.format_type==1).count()
+                    numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == user, Completion.was_skipped == False, Task.format_type == 1).count()
                     if numOfCompletions >= 2:
                         userScore.current_task_type = 4
                 elif userScore.current_task_type == 4:
-                    numOfCompletions = Completion.query.join(Task, Task.id==Completion.task_id).filter(Completion.batch_id==batch_id, Completion.user_id==user, Completion.was_skipped==False, Task.format_type==1).count()
+                    numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == user, Completion.was_skipped == False, Task.format_type == 1).count()
                     if numOfCompletions >= 2:
                         userScore.current_task_type = 5
                 elif userScore.current_task_type == 5:
@@ -1352,7 +1366,7 @@ def api_tasks_completions(task_id):
                     else:
                         userScore.current_task_type = 6
             else:
-                userScore = UserScore(user_id=user, batch_id=batch_id, score=20, showDemo = False, current_task_type=0)
+                userScore = UserScore(user_id=user, batch_id=batch_id, score=20, showDemo=False, current_task_type=0)
 
             db.session.add(userScore)
             db.session.commit()
@@ -1626,7 +1640,7 @@ def login():
     # Bypass if user is logged in
     if flask.request.method == 'GET':
         if flask_login.current_user.is_authenticated:
-            return redirect(flask.url_for('labeling_page'))
+            return redirect(flask.url_for('label_studio.labeling_page'))
         else:
             return flask.render_template('LoginForm.html')
     else:

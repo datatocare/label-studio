@@ -187,7 +187,7 @@ class JsonDBStorage(BaseStorage):
         #             {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
         if taskType in (1,2,3, 4):
             nextTask = db.session.execute(
-                'SELECT * FROM task WHERE id in (select task_id from completions where completions.user_id = 0 and completions.batch_id = :batchid ) and id not in (select task_id from completions where user_id = :userID  and completions.batch_id = :batchid) and batch_id = :batchid and format_type = :taskType order by random() LIMIT 1',
+                'SELECT * FROM task WHERE id in (select task_id from completions where completions.user_id = 0 and completions.batch_id = :batchid ) and id not in (select task_id from completions where user_id = :userID  and completions.batch_id = :batchid) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1', #random()
                 {'userID': userID, 'batchid': batchid, 'taskType': 1}).first()
             # if nextTask is None:
             #     nextTask = db.session.execute(
