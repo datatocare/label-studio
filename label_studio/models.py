@@ -14,13 +14,13 @@ class User(UserMixin, db.Model):
     )
     name = db.Column(
         db.String(100),
-        nullable=False,
-        unique=False
+        # nullable=False,
+        # unique=False
     )
     username = db.Column(
         db.String(100),
-        nullable=False,
-        unique=False
+        # nullable=False,
+        # unique=False
     )
 
     type = db.Column(
@@ -32,9 +32,9 @@ class User(UserMixin, db.Model):
 
     password = db.Column(
         db.String(200),
-        primary_key=False,
-        unique=False,
-        nullable=False
+        # primary_key=False,
+        # unique=False,
+        # nullable=False
     )
     created_on = db.Column(
         db.DateTime,
@@ -50,6 +50,7 @@ class User(UserMixin, db.Model):
     )
 
     is_admin = db.Column(db.Boolean, default=False)
+    workerId = db.Column(db.String(100))
 
     def set_password(self, password):
         """Create hashed password."""

@@ -21,7 +21,8 @@
     {% endif %}
 
     window.LSF_SDK = LSF_SDK("label-studio", `{{ label_config_line | safe }}`, task, false,
-                             null, false, null, "{{ batchid }}", 1, isAdmin);
+                             null, false, null, "{{ batchid }}", 1, isAdmin,"{{ workerId }}", "{{ hitId }}", "{{ turkSubmitTo }}",
+            "{{ assignmentId }}", "{{ gameid }}");
 
     {#var task = {{ task_data | json | safe }};#}
     {#window.LSF_SDK2 = LSF_SDK("label-studio2", `{{ label_config_line | safe }}`, task, false,#}
