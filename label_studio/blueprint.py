@@ -259,17 +259,21 @@ def reset_completion_page(batchid):
 
 @blueprint.route('/<batchid>')
 @blueprint.route('/', defaults={"batchid": '0'})
-@flask_login.login_required
+# @flask_login.login_required
 @exception_handler_page
 def labeling_page(batchid = '0'):
     """ Label stream for tasks
     """
     if batchid == '0':
         return redirect(flask.url_for('label_studio.batches_page'))
-
+    # urlParam = ""
     # if g.project.no_tasks():
     #     return redirect(url_for('label_studio.welcome_page'))
-
+    hitId = ""
+    turkSubmitTo = ""
+    assignmentId = ""
+    gameid = ""
+    workerId = ""
     # task data: load task or task with completions if it exists
     batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
     if batch_id is None:
@@ -277,7 +281,28 @@ def labeling_page(batchid = '0'):
     else:
         task_data = None
         task_id = request.args.get('task_id', None)
-        user_id = flask_login.current_user.get_id()
+        workerId = request.args.get('workerId', None)
+        if workerId is None:
+            user = flask_login.current_user
+            if user is None:
+                return redirect(flask.url_for('label_studio.login'))
+        else:
+
+            hitId = request.args.get('hitId', "")
+            turkSubmitTo = request.args.get('turkSubmitTo', "")
+            assignmentId = request.args.get('assignmentId', "")
+            gameid = request.args.get('gameid', "")
+            urlParam = "hitId=" + hitId + "/&turkSubmitTo=" + turkSubmitTo + "/&assignmentId=" + assignmentId + "/&gameid=" + gameid
+            existing_user = User.query.filter_by(workerId=workerId).first()
+            if existing_user is None:
+                user = User(
+                    workerId=workerId,
+                )
+                db.session.add(user)
+                db.session.commit()
+            else:
+                user = existing_user
+        user_id = user.get_id()
 
         userScore = UserScore.query.filter_by(user_id=user_id, batch_id=batch_id).first()
         if userScore is None:
@@ -338,8 +363,13 @@ def labeling_page(batchid = '0'):
         label_config_line=task['layout'],
         task_id=task_id,
         task_data=task_data,
-        user=flask_login.current_user,
+        user=user,
         batchid=batchid,
+        hitId = hitId,
+        turkSubmitTo = turkSubmitTo,
+        assignmentId = assignmentId,
+        gameid = gameid,
+        workerId=workerId,
         # showDemo=task['showDemo'],
         **find_editor_files()
     )
@@ -509,6 +539,10 @@ def del_Batch_tasks():
 
         db.session.execute("delete from task where batch_id = :batchid",
                 {'batchid': batchid})
+        db.session.commit()
+        db.session.execute(
+            'Delete FROM completions where completions.user_id = :userID and completions.batch_id = :batchid ',
+            {'userID': 0, 'batchid': batchid})
         db.session.commit()
         return make_response(json.dumps({'Error': False, "msg": "Tasks Deleted"}), 201)
 
@@ -1052,7 +1086,7 @@ def api_export():
 
 # @blueprint.route('/api/project/next', defaults={"batchid": '0'}, methods=['GET'])
 @blueprint.route('/api/project/next/<batchid>/', methods=['GET'])
-@flask_login.login_required
+# @flask_login.login_required
 @exception_handler
 def api_generate_next_task(batchid):
     """ Generate next task for labeling page (label stream)
@@ -1063,13 +1097,32 @@ def api_generate_next_task(batchid):
     # if batchid == '0':
     #     return make_response('', 404)
     # print(batchid)
-    userId = flask_login.current_user.get_id()
+    # userId = flask_login.current_user.get_id()
+
+    workerId = request.args.get('workerId', None)
+    if workerId is None:
+        user = flask_login.current_user
+        if user is None:
+            return redirect(flask.url_for('label_studio.login'))
+    else:
+        hitId = request.args.get('hitId', None)
+        turkSubmitTo = request.args.get('turkSubmitTo', None)
+        assignmentId = request.args.get('assignmentId', None)
+        gameid = request.args.get('gameid', None)
+        user = User.query.filter_by(workerId=workerId).first()
+        if user is None:
+            user = User(
+                workerId=workerId,
+            )
+            db.session.add(user)
+            db.session.commit()
+    userId = user.get_id()
     batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
     if batch_id is None:
         return make_response('', 404)
     # traingTask = request.values.get('traingTask', False)
     StepType = db.session.query(UserScore.current_task_type).filter(UserScore.user_id == userId, UserScore.batch_id == batch_id).scalar() # random
-    if flask_login.current_user.is_admin:
+    if user.is_admin:
         nextTask = db.session.execute("SELECT *, completions.id as comID  FROM task join completions on task.id == completions.task_id "
                                   "WHERE task.id not in (select task_id from completions as cm2 where cm2.user_id == 0 and "
                                   "cm2.batch_id =:batchid ) and task.batch_id = :batchid and task.format_type = :taskType"
@@ -1312,22 +1365,40 @@ def api_task_by_id(task_id):
 
 
 @blueprint.route('/api/tasks/<task_id>/completions', methods=['POST', 'DELETE'])
-@flask_login.login_required
+# @flask_login.login_required
 @exception_handler
 def api_tasks_completions(task_id):
     """ Save new completion or delete all completions
     """
     task_id = int(task_id)
-    user = flask_login.current_user.get_id()
-    if flask_login.current_user.is_admin:
-        user = 0
+    # user = flask_login.current_user.get_id()
+    workerId = request.args.get('workerId', None)
+    if workerId is None:
+        user = flask_login.current_user
+        if user is None:
+            return redirect(flask.url_for('label_studio.login'))
+    else:
+        hitId = request.args.get('hitId', None)
+        turkSubmitTo = request.args.get('turkSubmitTo', None)
+        assignmentId = request.args.get('assignmentId', None)
+        gameid = request.args.get('gameid', None)
+        user = User.query.filter_by(workerId=workerId).first()
+        if user is None:
+            user = User(
+                workerId=workerId,
+            )
+            db.session.add(user)
+            db.session.commit()
+    userId = user.get_id()
+    if user.is_admin:
+        userId = 0
     # save completion
     batch_id = db.session.query(Task.batch_id).filter(Task.id==task_id).scalar()
     if request.method == 'POST':
         completion = request.json
 
         # cancelled completion
-        userScore = UserScore.query.filter_by(user_id=user, batch_id=batch_id).first()
+        userScore = UserScore.query.filter_by(user_id=userId, batch_id=batch_id).first()
         was_cancelled = request.values.get('was_cancelled', False)
         if was_cancelled:
             completion['was_cancelled'] = True
@@ -1349,7 +1420,7 @@ def api_tasks_completions(task_id):
                 # return make_response(json.dumps({'IsEmpty': True, "msg":""}), 201)
             # userScore = UserScore.query.filter_by(user_id=user, batch_id=batch_id).first()
 
-        completion["user"] = user
+        completion["user"] = userId
         completion_id = g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled)
         # checkscore(completion)
 
@@ -1363,11 +1434,11 @@ def api_tasks_completions(task_id):
                 elif userScore.current_task_type == 2:
                     userScore.current_task_type = 3
                 elif userScore.current_task_type == 3:
-                    numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == user, Completion.was_skipped == False, Task.format_type == 1).count()
+                    numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False, Task.format_type == 1).count()
                     if numOfCompletions >= 2:
                         userScore.current_task_type = 4
                 elif userScore.current_task_type == 4:
-                    numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == user, Completion.was_skipped == False, Task.format_type == 1).count()
+                    numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False, Task.format_type == 1).count()
                     if numOfCompletions >= 2:
                         userScore.current_task_type = 5
                 elif userScore.current_task_type == 5:
@@ -1383,7 +1454,7 @@ def api_tasks_completions(task_id):
                     else:
                         userScore.current_task_type = 6
             else:
-                userScore = UserScore(user_id=user, batch_id=batch_id, score=20, showDemo=False, current_task_type=0)
+                userScore = UserScore(user_id=userId, batch_id=batch_id, score=20, showDemo=False, current_task_type=0)
 
             db.session.add(userScore)
             db.session.commit()

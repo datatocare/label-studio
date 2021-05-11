@@ -11,7 +11,7 @@ const API_URL = {
   COMPLETIONS: "/completions",
   CANCEL: "?was_cancelled=1",
   NEXT: "/next",
-    TraingTask: "?traingTask=",
+    TraingTask: "traingTask=",
   INSTRUCTION: "/project?fields=instruction"
 };
 
@@ -19,6 +19,8 @@ var lastId;
 var tmpLS;
 var isAdmin;
 var TaskdataObj;
+var urlParam;
+var hitId, turkSubmitTo, assignmentId, gameid;
 
 const Requests = (function(window) {
   const handleResponse = res => {
@@ -469,7 +471,7 @@ function reRenderTask(ls){
 }
 
 const loadNext = function(ls, reset, trainingTask, batchid) {
-  var url = `${API_URL.MAIN}${API_URL.PROJECT}${API_URL.NEXT}/${batchid}${API_URL.TraingTask}${trainingTask}`;
+  var url = `${API_URL.MAIN}${API_URL.PROJECT}${API_URL.NEXT}/${batchid}?${API_URL.TraingTask}${trainingTask}&${urlParam}`;
   return _loadTask(ls, url, "", reset);
 };
 
@@ -505,11 +507,17 @@ const _convertTask = function(task) {
 };
 
 
-const LSF_SDK = function(elid, config, task, hide_skip, description, reset, response, batchid, numofPanel, _isAdmin) {
+const LSF_SDK = function(elid, config, task, hide_skip, description, reset, response, batchid, numofPanel, _isAdmin,
+                         _workerId,_hitId,_turkSubmitTo,_assignmentId,_gameid ) {
 
   const showHistory = task === null;  // show history buttons only if label stream mode, not for task explorer
   const batch_id = batchid;
   isAdmin = _isAdmin;
+  if (_workerId != "None") {
+      urlParam = "workerId=" + _workerId + "&hitId=" + _hitId + "&turkSubmitTo=" + _turkSubmitTo + "&assignmentId=" + _assignmentId + "&gameid=" + _gameid;
+  } else {
+      urlParam = "";
+  }
   const _prepData = function(c, includeId) {
     var completion = {
       lead_time: (new Date() - c.loadedDate) / 1000,  // task execution time
@@ -603,7 +611,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
         //     return false ;
         // }
 
-      const req = Requests.poster(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/`, _prepData(c) );
+      const req = Requests.poster(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/?${urlParam}`, _prepData(c) );
 
       req.then(function(httpres) {
         httpres.json().then(function(res) {
@@ -675,7 +683,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
       ls.setFlags({ isLoading: true });
 
       const req = Requests.patch(
-        `${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/${c.pk}/`,
+        `${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/${c.pk}?${urlParam}`,
         _prepData(c)
       );
 
@@ -689,7 +697,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
     onDeleteCompletion: function(ls, completion) {
       ls.setFlags({ isLoading: true });
 
-      const req = Requests.remover(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/${completion.pk}/`);
+      const req = Requests.remover(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/${completion.pk}/?${urlParam}`);
       req.then(function(httpres) {
         ls.setFlags({ isLoading: false });
       });
@@ -708,7 +716,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
       var completion = _prepData(c, false);
 
       Requests.poster(
-        `${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}${API_URL.CANCEL}`,
+        `${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}${API_URL.CANCEL}&${urlParam}`,
         completion
       ).then(function(response) {
         response.json().then(function (res) {
