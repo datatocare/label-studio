@@ -285,6 +285,7 @@ def labeling_page(batchid = '0'):
         workerId = request.args.get('workerId', None)
         if workerId is None:
             user = flask_login.current_user
+
             if user.is_anonymous or not user.is_authenticated:
                 workerId = request.cookies.get('utm_source_id')
                 if workerId:
@@ -1126,30 +1127,18 @@ def api_generate_next_task(batchid):
 
     workerId = request.args.get('workerId', None)
     if workerId is None:
-        user_id = request.cookies.get('utm_source_id')
-        if user_id:
-            # GoogleSource = request.args.get('utm_source', None)
-            # if GoogleSource is None:
-            #     if 'session_id' not in session:
-            #         session['session_id'] = str(uuid4())
-
-            existing_user = User.query.filter_by(workerId=user_id).first()
-            if existing_user is None:
-                return make_response('', 404)
-                # tmp_workerId = str(uuid4())
-                # setCookie = True
-                # user = User(
-                #     workerId=tmp_workerId,
-                # )
-                # db.session.add(user)
-                # db.session.commit()
+        user = flask_login.current_user
+        if user.is_anonymous or not user.is_authenticated:
+            workerId = request.cookies.get('utm_source_id')
+            if workerId:
+                user = User.query.filter_by(workerId=workerId).first()
+                if user is None:
+                    return make_response('', 404)
             else:
-                user = existing_user
-        else:
-            user = flask_login.current_user
-            if user is None:
                 return make_response('', 404)
-                # return redirect(flask.url_for('label_studio.login'))
+        else:
+            if user is None:
+                return redirect(flask.url_for('label_studio.login'))
     else:
         hitId = request.args.get('hitId', None)
         turkSubmitTo = request.args.get('turkSubmitTo', None)
@@ -1421,29 +1410,18 @@ def api_tasks_completions(task_id):
     # user = flask_login.current_user.get_id()
     workerId = request.args.get('workerId', None)
     if workerId is None:
-        user_id = request.cookies.get('utm_source_id')
-        if user_id:
-            # GoogleSource = request.args.get('utm_source', None)
-            # if GoogleSource is None:
-            #     if 'session_id' not in session:
-            #         session['session_id'] = str(uuid4())
-            existing_user = User.query.filter_by(workerId=user_id).first()
-            if existing_user is None:
-                # tmp_workerId = str(uuid4())
-                # setCookie = True
-                # user = User(
-                #     workerId=tmp_workerId,
-                # )
-                # db.session.add(user)
-                # db.session.commit()
-                return make_response('', 404)
+        user = flask_login.current_user
+        if user.is_anonymous or not user.is_authenticated:
+            workerId = request.cookies.get('utm_source_id')
+            if workerId:
+                user = User.query.filter_by(workerId=workerId).first()
+                if user is None:
+                    return make_response('', 404)
             else:
-                user = existing_user
-        else:
-            user = flask_login.current_user
-            if user is None:
                 return make_response('', 404)
-                # return redirect(flask.url_for('label_studio.login'))
+        else:
+            if user is None:
+                return redirect(flask.url_for('label_studio.login'))
     else:
         hitId = request.args.get('hitId', None)
         turkSubmitTo = request.args.get('turkSubmitTo', None)
