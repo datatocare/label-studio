@@ -304,7 +304,7 @@ def labeling_page(batchid = '0'):
                     )
                     db.session.add(user)
                     db.session.commit()
-                    db.session.close()
+                    # db.session.close()
             else:
                 if user is None:
                     return redirect(flask.url_for('label_studio.login'))
@@ -321,7 +321,7 @@ def labeling_page(batchid = '0'):
                 )
                 db.session.add(user)
                 db.session.commit()
-                db.session.close()
+                # db.session.close()
             else:
                 user = existing_user
         user_id = user.get_id()
