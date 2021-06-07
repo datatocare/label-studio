@@ -274,6 +274,7 @@ def labeling_page(batchid = '0'):
     assignmentId = ""
     gameid = ""
     workerId = ""
+    setCookie = False
     # task data: load task or task with completions if it exists
     batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
     if batch_id is None:
@@ -284,10 +285,29 @@ def labeling_page(batchid = '0'):
         workerId = request.args.get('workerId', None)
         if workerId is None:
             user = flask_login.current_user
-            if user is None:
-                return redirect(flask.url_for('label_studio.login'))
+            if user.is_anonymous or not user.is_authenticated:
+                workerId = request.cookies.get('utm_source_id')
+                if workerId:
+                # GoogleSource = request.args.get('utm_source', None)
+                # if GoogleSource is None:
+                #     if 'session_id' not in session:
+                #         session['session_id'] = str(uuid4())
+                        user = User.query.filter_by(workerId=workerId).first()
+                        if user is None:
+                            return redirect(flask.url_for('label_studio.login'))
+                else:
+                    tmp_workerId = str(uuid4())
+                    setCookie = True
+                    user = User(
+                        workerId=tmp_workerId,
+                    )
+                    db.session.add(user)
+                    db.session.commit()
+                    db.session.close()
+            else:
+                if user is None:
+                    return redirect(flask.url_for('label_studio.login'))
         else:
-
             hitId = request.args.get('hitId', "")
             turkSubmitTo = request.args.get('turkSubmitTo', "")
             assignmentId = request.args.get('assignmentId', "")
@@ -300,6 +320,7 @@ def labeling_page(batchid = '0'):
                 )
                 db.session.add(user)
                 db.session.commit()
+                db.session.close()
             else:
                 user = existing_user
         user_id = user.get_id()
@@ -356,7 +377,7 @@ def labeling_page(batchid = '0'):
                 task = {}
                 task['layout'] = g.project.label_config_line
             logger.debug(json.dumps(task, indent=2))
-    return flask.render_template(
+    resp = make_response(flask.render_template(
         'labeling.html',
         project=g.project,
         config=g.project.config,
@@ -365,14 +386,18 @@ def labeling_page(batchid = '0'):
         task_data=task_data,
         user=user,
         batchid=batchid,
-        hitId = hitId,
-        turkSubmitTo = turkSubmitTo,
-        assignmentId = assignmentId,
-        gameid = gameid,
+        hitId=hitId,
+        turkSubmitTo=turkSubmitTo,
+        assignmentId=assignmentId,
+        gameid=gameid,
         workerId=workerId,
         # showDemo=task['showDemo'],
         **find_editor_files()
-    )
+    ))
+
+    if setCookie:
+        resp.set_cookie('utm_source_id', user.workerId)
+    return resp
 
 @blueprint.route('/AdminLabeling')
 @flask_login.login_required
@@ -1101,9 +1126,30 @@ def api_generate_next_task(batchid):
 
     workerId = request.args.get('workerId', None)
     if workerId is None:
-        user = flask_login.current_user
-        if user is None:
-            return redirect(flask.url_for('label_studio.login'))
+        user_id = request.cookies.get('utm_source_id')
+        if user_id:
+            # GoogleSource = request.args.get('utm_source', None)
+            # if GoogleSource is None:
+            #     if 'session_id' not in session:
+            #         session['session_id'] = str(uuid4())
+
+            existing_user = User.query.filter_by(workerId=user_id).first()
+            if existing_user is None:
+                return make_response('', 404)
+                # tmp_workerId = str(uuid4())
+                # setCookie = True
+                # user = User(
+                #     workerId=tmp_workerId,
+                # )
+                # db.session.add(user)
+                # db.session.commit()
+            else:
+                user = existing_user
+        else:
+            user = flask_login.current_user
+            if user is None:
+                return make_response('', 404)
+                # return redirect(flask.url_for('label_studio.login'))
     else:
         hitId = request.args.get('hitId', None)
         turkSubmitTo = request.args.get('turkSubmitTo', None)
@@ -1111,11 +1157,12 @@ def api_generate_next_task(batchid):
         gameid = request.args.get('gameid', None)
         user = User.query.filter_by(workerId=workerId).first()
         if user is None:
-            user = User(
-                workerId=workerId,
-            )
-            db.session.add(user)
-            db.session.commit()
+            return make_response('', 404)
+            # user = User(
+            #     workerId=workerId,
+            # )
+            # db.session.add(user)
+            # db.session.commit()
     userId = user.get_id()
     batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
     if batch_id is None:
@@ -1374,9 +1421,29 @@ def api_tasks_completions(task_id):
     # user = flask_login.current_user.get_id()
     workerId = request.args.get('workerId', None)
     if workerId is None:
-        user = flask_login.current_user
-        if user is None:
-            return redirect(flask.url_for('label_studio.login'))
+        user_id = request.cookies.get('utm_source_id')
+        if user_id:
+            # GoogleSource = request.args.get('utm_source', None)
+            # if GoogleSource is None:
+            #     if 'session_id' not in session:
+            #         session['session_id'] = str(uuid4())
+            existing_user = User.query.filter_by(workerId=user_id).first()
+            if existing_user is None:
+                # tmp_workerId = str(uuid4())
+                # setCookie = True
+                # user = User(
+                #     workerId=tmp_workerId,
+                # )
+                # db.session.add(user)
+                # db.session.commit()
+                return make_response('', 404)
+            else:
+                user = existing_user
+        else:
+            user = flask_login.current_user
+            if user is None:
+                return make_response('', 404)
+                # return redirect(flask.url_for('label_studio.login'))
     else:
         hitId = request.args.get('hitId', None)
         turkSubmitTo = request.args.get('turkSubmitTo', None)
@@ -1384,11 +1451,12 @@ def api_tasks_completions(task_id):
         gameid = request.args.get('gameid', None)
         user = User.query.filter_by(workerId=workerId).first()
         if user is None:
-            user = User(
-                workerId=workerId,
-            )
-            db.session.add(user)
-            db.session.commit()
+            return make_response('', 404)
+            # user = User(
+            #     workerId=workerId,
+            # )
+            # db.session.add(user)
+            # db.session.commit()
     userId = user.get_id()
     if user.is_admin:
         userId = 0
