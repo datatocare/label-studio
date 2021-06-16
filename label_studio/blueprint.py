@@ -235,6 +235,8 @@ def samples_time_series():
         mimetype='text/csv'
     )
 
+""" Reset Completions record of current user for given batchid, used for testing
+"""
 @blueprint.route('/<batchid>/reset')
 @flask_login.login_required
 @exception_handler_page
@@ -245,7 +247,7 @@ def reset_completion_page(batchid):
         return HttpResponse("<h1> Error: Invalid Batch Id</h1>" )
     userScore = UserScore.query.filter_by(user_id=user_id, batch_id=batch_id).first()
     if userScore is None:
-        return HttpResponse("<h1> Error: No completions </h1>" )
+        return HttpResponse("<h1> Error: User Score found! </h1>" )
     userScore.current_task_type = 1
     db.session.add(userScore)
     db.session.commit()
@@ -254,8 +256,7 @@ def reset_completion_page(batchid):
         'Delete FROM completions where completions.user_id = :userID and completions.batch_id = :batchid ',
         {'userID': user_id, 'batchid': batch_id})
     db.session.commit()
-    return HttpResponse("<h1>Completions Reset for " + batchid + "done</h1>")
-
+    return HttpResponse("<h1>Completions Reset for " + batchid + " done</h1>")
 
 @blueprint.route('/<batchid>')
 @blueprint.route('/', defaults={"batchid": '0'})
@@ -263,7 +264,10 @@ def reset_completion_page(batchid):
 @exception_handler_page
 def labeling_page(batchid = '0'):
     """ Label stream for tasks
+        Main landing page for a Job for given batchId
     """
+
+     # If 'batch id' is empty
     if batchid == '0':
         return redirect(flask.url_for('label_studio.batches_page'))
     # urlParam = ""
@@ -275,7 +279,8 @@ def labeling_page(batchid = '0'):
     gameid = ""
     workerId = ""
     setCookie = False
-    # task data: load task or task with completions if it exists
+
+    # get numeric id from hex id
     batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
     if batch_id is None:
         return redirect(flask.url_for('label_studio.invalid_page'))
@@ -283,10 +288,15 @@ def labeling_page(batchid = '0'):
         task_data = None
         task_id = request.args.get('task_id', None)
         workerId = request.args.get('workerId', None)
-        if workerId is None:
-            user = flask_login.current_user
+        # Check if user is coming from MTURK or google or a signed up User
 
+        # check for MTURK as workerId field is provided by amazon
+        if workerId is None:
+
+            # check if User is logged in using login screen
+            user = flask_login.current_user
             if user.is_anonymous or not user.is_authenticated:
+                # if not signed use cookies to keep track ( user is coming from Google ads)
                 workerId = request.cookies.get('utm_source_id')
                 if workerId:
                 # GoogleSource = request.args.get('utm_source', None)
@@ -309,6 +319,7 @@ def labeling_page(batchid = '0'):
                 if user is None:
                     return redirect(flask.url_for('label_studio.login'))
         else:
+            # MTruk user
             hitId = request.args.get('hitId', "")
             turkSubmitTo = request.args.get('turkSubmitTo', "")
             assignmentId = request.args.get('assignmentId', "")
@@ -324,8 +335,9 @@ def labeling_page(batchid = '0'):
                 # db.session.close()
             else:
                 user = existing_user
-        user_id = user.get_id()
 
+        user_id = user.get_id()
+        # get user score ( current task type (1-6)) or user score for batch
         userScore = UserScore.query.filter_by(user_id=user_id, batch_id=batch_id).first()
         if userScore is None:
             us = UserScore(user_id=user_id, batch_id=batch_id, score=20, showDemo=False, current_task_type=1)
@@ -333,6 +345,7 @@ def labeling_page(batchid = '0'):
             db.session.commit()
             userScore = us
 
+        # check by label_studio guys
         if task_id is not None:
             task_id = int(task_id)
             # Task explore mode
@@ -342,6 +355,7 @@ def labeling_page(batchid = '0'):
             if g.project.ml_backends_connected:
                 task_data = g.project.make_predictions(task_data)
         else:
+            # get next Task for user
             task = g.project.next_task(user_id, userScore.current_task_type, batch_id)
             if task is not None:
                 # no tasks found
@@ -1159,7 +1173,7 @@ def api_generate_next_task(batchid):
     # traingTask = request.values.get('traingTask', False)
     StepType = db.session.query(UserScore.current_task_type).filter(UserScore.user_id == userId, UserScore.batch_id == batch_id).scalar() # random
     if user.is_admin:
-        nextTask = db.session.execute("SELECT *, completions.id as comID  FROM task join completions on task.id == completions.task_id "
+        nextTask = db.session.execute("SELECT *, completions.id as comID FROM task join completions on task.id == completions.task_id "
                                   "WHERE task.id not in (select task_id from completions as cm2 where cm2.user_id == 0 and "
                                   "cm2.batch_id =:batchid ) and task.batch_id = :batchid and task.format_type = :taskType"
                                   " order by RANDOM() LIMIT 1",
