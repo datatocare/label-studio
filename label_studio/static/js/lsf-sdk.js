@@ -576,7 +576,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
      interfaces.push("side-column"); // entity
      interfaces.push("skip");
      // interfaces.push("leaderboad");
-     // interfaces.push("messages");
+     interfaces.push("messages");
   }
 
   var LS = new LabelStudio(elid, {

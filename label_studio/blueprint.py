@@ -368,8 +368,17 @@ def labeling_page(batchid = '0'):
                 # Newtask['showDemo'] = task['showDemo']
                 task = Newtask
                 ar = {}
-                ar["type"] = 3
-                ar["message"] = "Give your Answer"
+                numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(
+                    Completion.batch_id == batch_id, Completion.user_id == user_id,
+                    Completion.was_skipped == False).count()
+                numOfskips = Completion.query.join(Task, Task.id == Completion.task_id).filter(
+                    Completion.batch_id == batch_id, Completion.user_id == user_id,
+                    Completion.was_skipped == True).count()
+
+                ar = {}
+                ar["money"] = "56"
+                ar["completed"] = numOfCompletions
+                ar["skipped"] = numOfskips
                 task["taskAnswerResponse"] = ar
                 Newtask['data']['format_type'] = userScore.current_task_type
                 task["format_type"] = userScore.current_task_type #Newtask['data']['format_type']
@@ -471,8 +480,15 @@ def admin_labeling_page():
             # Newtask['showDemo'] = task['showDemo']
             task = Newtask
             ar = {}
-            ar["type"] = 3
-            ar["message"] = "Give your Answer"
+            numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(
+                Completion.batch_id == batch_id, Completion.user_id == user_id, Completion.was_skipped == False).count()
+            numOfskips = Completion.query.join(Task, Task.id == Completion.task_id).filter(
+                Completion.batch_id == batch_id, Completion.user_id == user_id, Completion.was_skipped == True).count()
+
+            ar = {}
+            ar["money"] = "56"
+            ar["completed"] = numOfCompletions
+            ar["skipped"] = numOfskips
             task["taskAnswerResponse"] = ar
             Newtask['data']['format_type'] = StepType
             task["format_type"] = StepType#Newtask['data']['format_type']
@@ -1224,8 +1240,15 @@ def api_generate_next_task(batchid):
         # task["completions"] = [completionData]  # [json.loads(completion.data)]
 
     ar = {}
-    ar["type"] = 3
-    ar["message"] = "Give your Answer"
+    numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(
+        Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False).count()
+    numOfskips = Completion.query.join(Task, Task.id == Completion.task_id).filter(
+        Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == True).count()
+
+    ar = {}
+    ar["money"] = "56"
+    ar["completed"] = numOfCompletions
+    ar["skipped"] = numOfskips
     task["taskAnswerResponse"] = ar
     # task = resolve_task_data_uri(task)
 
