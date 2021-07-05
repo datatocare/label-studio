@@ -59,6 +59,7 @@ from label_studio.tasks import Tasks
 from label_studio.utils.data_manager import prepare_tasks
 from label_studio.models import User, Completion, Layout, UserScore, Task, BatchData
 from label_studio import db
+import shapely.geometry as geoShape
 
 INPUT_ARGUMENTS_PATH = pathlib.Path("server.json")
 
@@ -249,6 +250,7 @@ def reset_completion_page(batchid):
     if userScore is None:
         return HttpResponse("<h1> Error: User Score found! </h1>" )
     userScore.current_task_type = 1
+    userScore.score = 0
     db.session.add(userScore)
     db.session.commit()
 
@@ -340,7 +342,7 @@ def labeling_page(batchid = '0'):
         # get user score ( current task type (1-6)) or user score for batch
         userScore = UserScore.query.filter_by(user_id=user_id, batch_id=batch_id).first()
         if userScore is None:
-            us = UserScore(user_id=user_id, batch_id=batch_id, score=20, showDemo=False, current_task_type=1)
+            us = UserScore(user_id=user_id, batch_id=batch_id, score=0, showDemo=False, current_task_type=1)
             db.session.add(us)
             db.session.commit()
             userScore = us
@@ -449,7 +451,7 @@ def admin_labeling_page():
 
         userScore = UserScore.query.filter_by(user_id=user_id, batch_id=batch_id).first()
         if userScore is None:
-            us = UserScore(user_id=user_id, batch_id=batch_id, score=20, showDemo=False, current_task_type=1)
+            us = UserScore(user_id=user_id, batch_id=batch_id, score=0, showDemo=False, current_task_type=1)
             db.session.add(us)
             db.session
 
@@ -1488,6 +1490,9 @@ def api_tasks_completions(task_id):
         else:
             completion.pop('skipped', None)  # deprecated
             completion.pop('was_cancelled', None)
+            originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
+            # evluated = evulateCompletion(completion, originalCompletion, batch_id)
+
             if userScore.current_task_type == 3 or (userScore.current_task_type in (4, 5, 6) and batch_id == 5):
                 originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
                 data = json.loads(originalCompletion.data)
@@ -1506,12 +1511,10 @@ def api_tasks_completions(task_id):
         completion["user"] = userId
         completion_id = g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled)
         # checkscore(completion)
-
         logger.debug("Received completion" + json.dumps(completion, indent=2))
         logger.debug(completion_id)
         if not was_cancelled:
             if userScore is not None:
-                userScore.score = userScore.score + 10
                 if userScore.current_task_type == 1:
                     userScore.current_task_type = 2
                 elif userScore.current_task_type == 2:
@@ -1521,8 +1524,14 @@ def api_tasks_completions(task_id):
                     if numOfCompletions >= 2:
                         userScore.current_task_type = 4
                 elif userScore.current_task_type == 4:
-                    numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False, Task.format_type == 1).count()
-                    if numOfCompletions >= 2:
+                    # originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
+                    if evulateCompletion(completion, originalCompletion, batch_id):
+                        userScore.score = userScore.score + 10
+                    else:
+                        userScore.score = userScore.score - 5
+                    # numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False, Task.format_type == 1).count()
+                    # if userScore.score > 40 and numOfCompletions >= 2:
+                    if userScore.score > 40:
                         userScore.current_task_type = 5
                 elif userScore.current_task_type == 5:
                     rardNum = random.uniform(0, 1)
@@ -1537,7 +1546,7 @@ def api_tasks_completions(task_id):
                     else:
                         userScore.current_task_type = 6
             else:
-                userScore = UserScore(user_id=userId, batch_id=batch_id, score=20, showDemo=False, current_task_type=0)
+                userScore = UserScore(user_id=userId, batch_id=batch_id, score=0, showDemo=False, current_task_type=0)
 
             db.session.add(userScore)
             db.session.commit()
@@ -1554,7 +1563,77 @@ def api_tasks_completions(task_id):
             return make_response({'detail': 'Completion removing is not allowed in server config'}, 422)
 
 
+def evulateCompletion(completion, originalCompletion, batch_id):
+    groundTruth = json.loads(originalCompletion.data)
+    if batch_id == 1:
+        found = 0
+        for ur in completion['result']: #us = user response
+            for gt in groundTruth['result']: # gt = groundTruth
+                if gt['value']['start'] == ur['value']['start'] and gt['value']['end'] == ur['value']['end'] and\
+                    gt['value']['text'] == ur['value']['text'] and gt['value']['labels'][0] == ur['value']['labels'][0]:
+                    found = found + 1
+                    break
+        if found/len(groundTruth['result']) >= 0.7:
+            return True
+        else:
+            return False
+    elif batch_id == 2:
+        iou = 0
+        for ur in completion['result']:
+            for gt in groundTruth['result']:
+                if ur['value']['rectanglelabels'][0] == gt['value']['rectanglelabels'][0]:
+                    completionbbox = (
+                    ur['value']['x'], ur['value']['y'], ur['value']['width'],
+                    ur['value']['height'])
+                    completionrect = geoShape.box(*completionbbox, ccw=True)
+                    groundTruthbbox = (
+                        gt['value']['x'], gt['value']['y'],
+                        gt['value']['width'],
+                        gt['value']['height'])
+                    groundTruthrect = geoShape.box(*groundTruthbbox, ccw=True)
+                    if ((completionrect.intersection(groundTruthrect).area) / groundTruthrect.area * 100) >= 50:
+                        iou = iou + completionrect.intersection(groundTruthrect).area / completionrect.union(groundTruthrect).area
+        if iou / len(groundTruth['result']) >= 0.5:
+            return True
+        return False
+    elif batch_id == 3:
+        iou =  0
+        for ur in completion['result']:
+            for gt in groundTruth['result']:
+                if ur['value']['polygonlabels'][0] == gt['value']['polygonlabels'][0]:
+                    groundTruthPoly = geoShape.Polygon(ur['value']['points'])
+                    completionPoly = geoShape.Polygon(gt['value']['points'])
+                    if ((completionPoly.intersection(groundTruthPoly).area)/groundTruthPoly.area * 100) > 50:
+                        iou = iou + completionPoly.intersection(groundTruthPoly).area / completionPoly.union(groundTruthPoly).area
+        if iou/len(groundTruth['result']) >= 0.5:
+            return True
+        return False
+    elif batch_id == 4:
+        found = 0
+        for ur in completion['result'][0]['value']['choices']:
+            for gt in groundTruth['result'][0]['value']['choices']:
+                if gt == ur:
+                    found = found + 1
+                    break
+        if found / len(groundTruth['result'][0]['value']['choices']) >= 0.7:
+            return True
 
+        return False
+    elif batch_id == 5:
+        found = 0
+        for ur in completion['result']: #us = user response
+            if ur["type"] == "relation":
+                for gt in groundTruth['result']: # gt = groundTruth
+                    if gt["type"] == "relation":
+                        return True
+
+    elif batch_id == 7:
+        if len(completion['result'])>0:
+            if completion['result'][0]['value']['choices'][0] == groundTruth['result'][0]['value']['choices'][0]:
+                return True
+            else:
+                return False
+    return False
 @blueprint.route('/api/tasks/<task_id>/completions/<completion_id>', methods=['PATCH', 'DELETE'])
 @flask_login.login_required
 @exception_handler
