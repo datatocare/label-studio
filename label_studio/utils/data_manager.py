@@ -9,9 +9,20 @@ class DataManagerException(Exception):
     pass
 
 
+def count_total_users_tasks(params):
+    count_total_tasks = db.session.execute(
+        'select count(*) from completions where task_id in (SELECT id FROM task WHERE batch_id = :batchid) and user_id not in (select id from user where is_admin = 1)',
+        {'batchid': params.batchid}).scalar()
+    return count_total_tasks
+
+
 def prepare_tasks(project, params):
     order, page, page_size = params.order, params.page, params.page_size
     fields = params.fields
+
+    # print(page)
+    # print(page_size)
+
 
     ascending = order[0] == '-'
     order = order[1:] if order[0] == '-' else order
@@ -26,8 +37,8 @@ def prepare_tasks(project, params):
 
     # completed_at_data = db.session.query(Completion.task_id,Completion.data,Completion.completed_at).filter_by(user_id=flask_login.current_user.get_id()).all()
     completed_at_data = db.session.execute(
-        'select task_id,data,completed_at from completions where user_id = :userID and task_id in  (SELECT id FROM task WHERE batch_id = :batchid and format_type != 1)',
-        {'userID': flask_login.current_user.get_id(), 'batchid': params.batchid})
+        'select task_id,data,completed_at from completions where task_id in (SELECT id FROM task WHERE batch_id = :batchid) and user_id not in (select id from user where is_admin = 1)',
+        {'batchid': params.batchid})
 
     completed_at = {}
     cancelled_status = {}
@@ -59,6 +70,7 @@ def prepare_tasks(project, params):
         else:
             item['has_cancelled_completions'] = None
         pre_order.append(item)
+
     # ordering
     # pre_order = ({
     #     'id': i,
@@ -81,8 +93,10 @@ def prepare_tasks(project, params):
 
     paginated = ordered[(page - 1) * page_size:page * page_size]
 
+    # print(paginated)
     # get tasks with completions
     tasks = []
+
     for item in paginated:
         i = item['id']
         task = project.source_storage.get(i) #project.get_task_with_completions(i)
@@ -94,43 +108,15 @@ def prepare_tasks(project, params):
             completionData = json.loads(completion.data)
             completionData['id'] = completion.id
             # logger.debug(json.dumps(completionData, indent=2))
-            task["completions"] = [completionData]#[json.loads(completion.data)]
+            task["completion"] = [completionData]#[json.loads(completion.data)]
             task['completed_at'] = item['completed_at']
             task['has_cancelled_completions'] = item['has_cancelled_completions']
         task['data'] = {}
         task['data']['text'] = task['text']
         task.pop('text', None)
         task["layout"] = db_layout.data
-        UserRanks = []
-        ur = {}
-        ur["rank"] = 1
-        ur["UserName"] = "Bilal Saleem"
-        UserRanks.append(ur)
-        ur = {}
-        ur["rank"] = 2
-        ur["UserName"] = "Djelle "
-        UserRanks.append(ur)
-        ur = {}
-        ur["rank"] = 3
-        ur["UserName"] = "Shan"
-        UserRanks.append(ur)
-        task["userranks"] = UserRanks
-        ar = {}
-        ar["type"] = 1
-        ar["message"] = "Your Answer is correct"
-        task["taskAnswerResponse"] = ar
-        # task = project.get_task_with_completions(i)
-        #
-        # # no completions at task, get task without completions
-        # if task is None:
-        #     task = project.source_storage.get(i)
-        # else:
-        #     # evaluate completed_at time
-        #     completed_at = item['completed_at']
-        #     if completed_at != 'undefined' and completed_at is not None:
-        #         completed_at = timestamp_to_local_datetime(completed_at).strftime('%Y-%m-%d %H:%M:%S')
-        #     task['completed_at'] = completed_at
-        #     task['has_cancelled_completions'] = item['has_cancelled_completions']
+        task['data'].pop('predictions', None)
+        
 
         # don't resolve data (s3/gcs is slow) if it's not in fields
         if 'all' in fields or 'data' in fields:

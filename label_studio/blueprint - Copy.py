@@ -56,7 +56,7 @@ from label_studio.utils.auth import requires_auth
 from label_studio.storage import get_storage_form
 from label_studio.project import Project
 from label_studio.tasks import Tasks
-from label_studio.utils.data_manager import prepare_tasks, count_total_users_tasks
+from label_studio.utils.data_manager import prepare_tasks, count_total_user_tasks, get_admin_status
 from label_studio.models import User, Completion, Layout, UserScore, Task, BatchData
 from label_studio import db
 import shapely.geometry as geoShape
@@ -242,10 +242,6 @@ def samples_time_series():
 @flask_login.login_required
 @exception_handler_page
 def reset_completion_page(batchid):
-
-    if not flask_login.current_user.is_admin:
-        return redirect(flask.url_for('label_studio.invalid_page'))
-
     user_id = flask_login.current_user.get_id()
     batch_id = db.session.query(BatchData.id).filter(BatchData.hexID == batchid).scalar()
     if batch_id is None:
@@ -272,6 +268,7 @@ def labeling_page(batchid = '0'):
     """ Label stream for tasks
         Main landing page for a Job for given batchId
     """
+    print('in labelling page')
      # If 'batch id' is empty
     if batchid == '0':
         return redirect(flask.url_for('label_studio.batches_page'))
@@ -330,6 +327,7 @@ def labeling_page(batchid = '0'):
                 user = existing_user
 
         user_id = user.get_id()
+        print(user_id)
         # get user score ( current task type (1-6)) or user score for batch
         userScore = UserScore.query.filter_by(user_id=user_id, batch_id=batch_id).first()
         if userScore is None:
@@ -338,16 +336,73 @@ def labeling_page(batchid = '0'):
             db.session.commit()
             userScore = us
 
-        db_layout_id = Task.query.filter_by(batch_id=batch_id).first()
-        db_layout_id = db_layout_id.layout_id
-        layout = Layout.query.filter_by(id=db_layout_id).first()
-        layout = layout.data
+        # check by label_studio guys
+        if task_id is not None:
+            task_id = int(task_id)
+            # Task explore mode
+            task_data = g.project.get_task_with_completions(task_id) or g.project.source_storage.get(task_id)
+            task_data = resolve_task_data_uri(task_data, project=g.project)
 
+            if g.project.ml_backends_connected:
+                task_data = g.project.make_predictions(task_data)
+        else:
+            # get next Task for user
+            print('getting task for user')
+            task = g.project.next_task(user_id, userScore.current_task_type, batch_id)
+            if task is not None:
+                # no tasks found
+                Newtask = {}
+                Newtask['data'] = task
+                Newtask['id'] = task['id']
+                db_layout = Layout.query.filter_by(id=task['layout_id']).first()
+                Newtask['layout'] = db_layout.data  # task['layout']
+                Newtask['description'] = task['description']
+                # Newtask['showDemo'] = task['showDemo']
+                task = Newtask
+                ar = {}
+                numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(
+                    Completion.batch_id == batch_id, Completion.user_id == user_id,
+                    Completion.was_skipped == False).count()
+                numOfskips = Completion.query.join(Task, Task.id == Completion.task_id).filter(
+                    Completion.batch_id == batch_id, Completion.user_id == user_id,
+                    Completion.was_skipped == True).count()
+
+                ar = {}
+                ar["money"] = "56"
+                ar["completed"] = numOfCompletions
+                ar["skipped"] = numOfskips
+                task["taskAnswerResponse"] = ar
+                Newtask['data']['format_type'] = userScore.current_task_type
+                task["format_type"] = userScore.current_task_type #Newtask['data']['format_type']
+                if 'completions' in Newtask['data']:
+                    task["completions"] = Newtask['data']['completions']
+
+
+                # if "result" in task["data"]:
+                # completion = Completion.query.filter_by(user_id=flask_login.current_user.get_id(), task_id=task_id).first()
+                # if completion is not None:
+                #     completionData = json.loads(task["data"]["result"])
+                #     completionData['id'] = 1
+                    # logger.debug(json.dumps(json.loads(completion.data), indent=2))
+                    # task["completions"] = [completionData]  # [json.loads(completion.data)]
+
+                # task = resolve_task_data_uri(task)
+
+                task = resolve_task_data_uri(task, project=g.project)
+            else:
+                task = {}
+                task['layout'] = g.project.label_config_line
+            logger.debug(json.dumps(task, indent=2))
+    # print('task_id, task_data and user')
+    # print(task_data)
+    # print(task_id)
+    print(user)
+    #print(task)
     resp = make_response(flask.render_template(
         'labeling.html',
         project=g.project,
         config=g.project.config,
-        label_config_line=layout,
+        label_config_line=task['layout'],
         task_id=task_id,
         task_data=task_data,
         user=user,
@@ -515,8 +570,6 @@ def invalid_page():
 def batches_page():
     """ On-boarding page
     """
-    if not flask_login.current_user.is_admin:
-        return redirect(flask.url_for('label_studio.invalid_page'))
 
     # is_admin = flask_login.current_user.__getattr__("is_admin")
     batches = db.session.execute("select * from BatchData")
@@ -535,8 +588,6 @@ def batches_page():
 @exception_handler_page
 def del_Batch_tasks():
 
-    if not flask_login.current_user.is_admin:
-        return redirect(flask.url_for('label_studio.invalid_page'))
 
     if request.method == 'POST':
         batchid = request.values.get('batchid', '-1')
@@ -559,10 +610,6 @@ def del_Batch_tasks():
 def tasks_page():
     """ Tasks and completions page
     """
-
-    if not flask_login.current_user.is_admin:
-        return redirect(flask.url_for('label_studio.invalid_page'))
-
     batchid = request.args.get('batchid', None)
     if batchid is None:
         return redirect(flask.url_for('label_studio.invalid_page'))
@@ -644,9 +691,6 @@ def setup_page():
 def import_page():
     """ Import tasks from JSON, CSV, ZIP and more
     """
-    if not flask_login.current_user.is_admin:
-        return redirect(flask.url_for('label_studio.invalid_page'))
-
     return flask.render_template(
         'import.html',
         config=g.project.config,
@@ -659,10 +703,6 @@ def import_page():
 @flask_login.login_required
 @exception_handler_page
 def my_import_page():
-
-    if not flask_login.current_user.is_admin:
-        return redirect(flask.url_for('label_studio.invalid_page'))
-
     """ Import tasks from JSON, CSV, ZIP and more
     """
     task= {'text': 'ABBA Live is an album of live recordings by Swedish pop group ABBA , released by Polar Music in 1986. A live album was something that many ABBA fans had demanded for several years. ABBA themselves had toyed with the idea on a couple of occasions , but always decided against it. Finally , four years after the members went their separate ways , a live collection was released after all. The resultant album , ABBA Live , contained recordings from 1977 , 1979 and 1981. The tracks were mostly taken from ABBA ’s concerts at Wembley Arena in London in November 1979 , with a few additional songs taken from the tour of Australia in March 1977 and the Dick Cavett Meets ABBA television special , taped in April 1981. When this LP / CD was released , the band \'s popularity was at an all - time low and none of the members themselves were involved in the production of the album. Much to the dismay of both music critics and ABBA fans it also had 80 \'s synth drums overdubbed on most tracks , taking away the true live feeling of the performances. Neither did it feature any of the tracks that the band had performed live on their tours but never included on any of their studio albums , such as " I Am an A " , " Get on the Carousel " , " I \'m Still Alive " , or the original live versions of the songs from the 1977 mini - musical The Girl with the Golden Hair : " Thank You for the Music " , " I Wonder ( Departure ) " and " I \'m a Marionette " , all of which had slightly different lyrics and/or musical arrangements to the subsequent studio recordings included on. Several tracks had also been heavily edited , in the case of the 1979 live recording of " Does Your Mother Know " by as much as five minutes since it originally was performed on that tour as a medley with " Hole in Your Soul ". ABBA Live was the first ABBA album to be simultaneously released on LP and CD , the CD having three " extra tracks ". The album did not perform very well , internationally or domestically , peaking at # 49 in Sweden and only staying in the charts for two weeks. It was remastered and rereleased by Polydor / Polar in 1997 , but is currently out of print.', 'layout_id': 2, 'groundTruth': ' ', 'format_type': 1, 'batch_id': 1, 'description': ' ', 'id': 0}
@@ -706,9 +746,6 @@ def import_Task_page():
 def export_page():
     """ Export page: export completions as JSON or using converters
     """
-    if not flask_login.current_user.is_admin:
-        return redirect(flask.url_for('label_studio.invalid_page'))
-
     return flask.render_template(
         'export.html',
         config=g.project.config,
@@ -1061,13 +1098,10 @@ def api_task_import():
                 db.session.add(dbtask)
                 db.session.flush()
                 completion = task['completion']
-                ft = 1
-                if "format_type" in completion:
-                    ft = completion["format_type"]
                 dbCompletion = Completion(user_id=0, task_id=dbtask.id,
                                           data=completion['data'],
                                           completed_at=completion['completed_at'], batch_id=completion['batch_id'],
-                                          was_skipped=completion['was_skipped'], format_type=ft)  # ,hexID=completion["result"][0]['id']
+                                          was_skipped=completion['was_skipped'])  # ,hexID=completion["result"][0]['id']
 
                 db.session.add(dbCompletion)
         else:
@@ -1112,7 +1146,6 @@ def api_export():
 # @flask_login.login_required
 @exception_handler
 def api_generate_next_task(batchid):
-    print('generating new task')
     """ Generate next task for labeling page (label stream)
     """
     # try to find task is not presented in completions
@@ -1190,12 +1223,16 @@ def api_generate_next_task(batchid):
     #         task = None
     # else:
     #     task = g.project.next_task(userId, StepType, batch_id)
+    print(userId)
+    print(StepType)
+    print(batch_id)
     task = g.project.next_task(userId, StepType, batch_id)
 
     if task is None:
         # no tasks found
         return make_response('', 404)
 
+    print('making new task')
     Newtask = {}
     Newtask['data'] = task
     Newtask['id'] = task['id']
@@ -1216,23 +1253,20 @@ def api_generate_next_task(batchid):
         # logger.debug(json.dumps(json.loads(completion.data), indent=2))
         # task["completions"] = [completionData]  # [json.loads(completion.data)]
 
+    print(task)
     ar = {}
     numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(
-        Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False, Completion.format_type > 2).count()
+        Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False).count()
     numOfskips = Completion.query.join(Task, Task.id == Completion.task_id).filter(
-        Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == True, Completion.format_type > 2).count()
+        Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == True).count()
 
     ar = {}
     ar["money"] = "56"
-    if StepType > 2:
-        ar["completed"] = numOfCompletions
-        ar["skipped"] = numOfskips
-    else:
-        ar["completed"] = 0
-        ar["skipped"] = 0
-
+    ar["completed"] = numOfCompletions
+    ar["skipped"] = numOfskips
     task["taskAnswerResponse"] = ar
     # task = resolve_task_data_uri(task)
+    print('resolving new task')
     task = resolve_task_data_uri(task, project=g.project)
 
     # collect prediction from multiple ml backends
@@ -1330,10 +1364,10 @@ def api_project_switch():
     else:
         return make_response(jsonify(output), 200)
 
-@blueprint.route('/api/users_tasks_count', methods=['GET'])
+@blueprint.route('/api/user_tasks_count', methods=['GET'])
 @flask_login.login_required
 @exception_handler
-def api_users_tasks_count():
+def api_user_tasks_count():
     """ Tasks API: retrieve by filters, delete all tasks
     """
     # retrieve tasks (plus completions and predictions) with pagination & ordering
@@ -1344,10 +1378,23 @@ def api_users_tasks_count():
         if batch_id is None:
             return make_response('', 404)
 
+        print('Getting Tasks count, Here debug by shan, remove print if seen in production')
         params = SimpleNamespace(batchid=batch_id)
-        count = count_total_users_tasks(params)
+        count = count_total_user_tasks(params)
         return make_response(jsonify(str(count)), 200)
 
+
+@blueprint.route('/api/get_admin_status', methods=['GET'])
+@flask_login.login_required
+@exception_handler
+def api_admin_status():
+    """ Tasks API: retrieve by filters, delete all tasks
+    """
+    # retrieve tasks (plus completions and predictions) with pagination & ordering
+    if request.method == 'GET':
+        print('Getting admin status, Here debug by shan, remove print if seen in production')
+        admin_status = get_admin_status()
+        return make_response(jsonify(str(admin_status)), 200)
 
 
 @blueprint.route('/api/tasks', methods=['GET', 'DELETE'])
@@ -1369,7 +1416,7 @@ def api_all_tasks():
         order = request.values.get('order', 'id')
         if page < 1 or page_size < 1:
             return make_response(jsonify({'detail': 'Incorrect page or page_size'}), 422)
-            
+
         params = SimpleNamespace(batchid=batch_id, fields=fields, page=page, page_size=page_size, order=order)
         tasks = prepare_tasks(g.project, params)
         return make_response(jsonify(tasks), 200)
@@ -1405,21 +1452,20 @@ def api_task_by_id(task_id):
         task['data'] = {}
         task['data']['text'] = task['text']
         task.pop('text', None)
-        task.pop('predictions', None)
-        # UserRanks = []
-        # ur = {}
-        # ur["rank"] = 1
-        # ur["UserName"] = "Bilal Saleem"
-        # UserRanks.append(ur)
-        # ur = {}
-        # ur["rank"] = 2
-        # ur["UserName"] = "Djelle "
-        # UserRanks.append(ur)
-        # ur = {}
-        # ur["rank"] = 3
-        # ur["UserName"] = "Shan"
-        # UserRanks.append(ur)
-        # task["data"]["userranks"] = UserRanks
+        UserRanks = []
+        ur = {}
+        ur["rank"] = 1
+        ur["UserName"] = "Bilal Saleem"
+        UserRanks.append(ur)
+        ur = {}
+        ur["rank"] = 2
+        ur["UserName"] = "Djelle "
+        UserRanks.append(ur)
+        ur = {}
+        ur["rank"] = 3
+        ur["UserName"] = "Shan"
+        UserRanks.append(ur)
+        task["data"]["userranks"] = UserRanks
 
         if g.project.ml_backends_connected:
             task = g.project.make_predictions(task)
@@ -1480,11 +1526,11 @@ def api_tasks_completions(task_id):
     batch_id = db.session.query(Task.batch_id).filter(Task.id==task_id).scalar()
     if request.method == 'POST':
         completion = request.json
-        # print(completion)
+        print(completion)
         # cancelled completion
         userScore = UserScore.query.filter_by(user_id=userId, batch_id=batch_id).first()
         was_cancelled = request.values.get('was_cancelled', False)
-        # print(was_cancelled)
+        print(was_cancelled)
         if was_cancelled:
             completion['was_cancelled'] = True
         else:
@@ -1513,44 +1559,32 @@ def api_tasks_completions(task_id):
         print('return before adding completion')
         completion["user"] = userId
 
-        accuracy = 0.0
-        completed_task_type = 1
-        # checkscore(completion)
+        completion_id = g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled)
 
+        # checkscore(completion)
+        logger.debug("Received completion" + json.dumps(completion, indent=2))
+        logger.debug(completion_id)
         if not was_cancelled:
             if userScore is not None:
-                completed_task_type = userScore.current_task_type
                 if userScore.current_task_type == 1:
                     userScore.current_task_type = 2
                 elif userScore.current_task_type == 2:
                     userScore.current_task_type = 3
                 elif userScore.current_task_type == 3:
-                    userScore.current_task_type = 4
+                    numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False, Task.format_type == 1).count()
+                    if numOfCompletions >= 2:
+                        userScore.current_task_type = 4
                 elif userScore.current_task_type == 4:
-                    current_completion_accuracy = evulateCompletion(completion, originalCompletion, batch_id)
-                    user_completions_accuracy = db.session.execute(
-                        'SELECT accuracy FROM completions WHERE user_id = :userid and batch_id = :batchid and format_type = 4 and was_skipped = False',
-                        {'batchid': batch_id, 'userid': userId}).all()
-                    print(user_completions_accuracy)
-                    if user_completions_accuracy is not None:
-                        print('here accuracy')
-                        accuracies = [float(uca[0]) for uca in user_completions_accuracy]
-                        num_completions = len(accuracies) + 1
-                        accuracy = 100
-                        # (sum(accuracies) + current_completion_accuracy)/(num_completions)
-
-                        req_comps = db.session.query(BatchData.number_of_completions).filter(BatchData.id == batch_id).scalar()
-                        req_accuracy = db.session.query(BatchData.accuracy).filter(BatchData.id == batch_id).scalar()
-
-                        if num_completions >= req_comps:
-                            if accuracy >= req_accuracy:
-                                print('progressing to stage 5')
-                                userScore.current_task_type = 5
+                    # originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
+                    if evulateCompletion(completion, originalCompletion, batch_id):
+                        userScore.score = userScore.score + 10
                     else:
-                        print('completion is none so far')
-
+                        userScore.score = userScore.score - 5
+                    # numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False, Task.format_type == 1).count()
+                    # if userScore.score > 40 and numOfCompletions >= 2:
+                    if userScore.score > 40:
+                        userScore.current_task_type = 5
                 elif userScore.current_task_type == 5:
-                    userScore.current_task_type = 6
                     rardNum = random.uniform(0, 1)
                     if rardNum >= 0.2:
                         userScore.current_task_type = 5
@@ -1563,15 +1597,11 @@ def api_tasks_completions(task_id):
                     else:
                         userScore.current_task_type = 6
             else:
-                userScore = UserScore(user_id=userId, batch_id=batch_id, score=0, showDemo=False, current_task_type=1)
+                userScore = UserScore(user_id=userId, batch_id=batch_id, score=0, showDemo=False, current_task_type=0)
 
             db.session.add(userScore)
             db.session.commit()
 
-        print('about to save completion')
-        completion_id = g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled, completed_task_type, accuracy)
-        logger.debug("Received completion" + json.dumps(completion, indent=2))
-        logger.debug(completion_id)
         # completion_id = g.project.save_completion(task_id, completion)
         return make_response(json.dumps({'id': completion_id}), 201)
 
@@ -1586,8 +1616,6 @@ def api_tasks_completions(task_id):
 
 def evulateCompletion(completion, originalCompletion, batch_id):
     groundTruth = json.loads(originalCompletion.data)
-    print(completion)
-    print(groundTruth)
     if batch_id == 1:
         found = 0
         for ur in completion['result']: #us = user response
@@ -1596,7 +1624,10 @@ def evulateCompletion(completion, originalCompletion, batch_id):
                     gt['value']['text'] == ur['value']['text'] and gt['value']['labels'][0] == ur['value']['labels'][0]:
                     found = found + 1
                     break
-        return found/len(groundTruth['result'])
+        if found/len(groundTruth['result']) >= 0.7:
+            return True
+        else:
+            return False
     elif batch_id == 2:
         iou = 0
         for ur in completion['result']:
@@ -1613,7 +1644,9 @@ def evulateCompletion(completion, originalCompletion, batch_id):
                     groundTruthrect = geoShape.box(*groundTruthbbox, ccw=True)
                     if ((completionrect.intersection(groundTruthrect).area) / groundTruthrect.area * 100) >= 50:
                         iou = iou + completionrect.intersection(groundTruthrect).area / completionrect.union(groundTruthrect).area
-        return iou / len(groundTruth['result'])
+        if iou / len(groundTruth['result']) >= 0.5:
+            return True
+        return False
     elif batch_id == 3:
         iou =  0
         for ur in completion['result']:
@@ -1623,7 +1656,9 @@ def evulateCompletion(completion, originalCompletion, batch_id):
                     completionPoly = geoShape.Polygon(gt['value']['points'])
                     if ((completionPoly.intersection(groundTruthPoly).area)/groundTruthPoly.area * 100) > 50:
                         iou = iou + completionPoly.intersection(groundTruthPoly).area / completionPoly.union(groundTruthPoly).area
-        return iou/len(groundTruth['result'])
+        if iou/len(groundTruth['result']) >= 0.5:
+            return True
+        return False
     elif batch_id == 4:
         found = 0
         for ur in completion['result'][0]['value']['choices']:
@@ -1631,22 +1666,25 @@ def evulateCompletion(completion, originalCompletion, batch_id):
                 if gt == ur:
                     found = found + 1
                     break
-        return found / len(groundTruth['result'][0]['value']['choices'])
+        if found / len(groundTruth['result'][0]['value']['choices']) >= 0.7:
+            return True
+
+        return False
     elif batch_id == 5:
         found = 0
         for ur in completion['result']: #us = user response
             if ur["type"] == "relation":
                 for gt in groundTruth['result']: # gt = groundTruth
                     if gt["type"] == "relation":
-                        return 100.0
+                        return True
 
     elif batch_id == 7:
         if len(completion['result'])>0:
             if completion['result'][0]['value']['choices'][0] == groundTruth['result'][0]['value']['choices'][0]:
-                return 100.0
+                return True
             else:
-                return 0.0
-    return 0.0
+                return False
+    return False
 @blueprint.route('/api/tasks/<task_id>/completions/<completion_id>', methods=['PATCH', 'DELETE'])
 @flask_login.login_required
 @exception_handler
@@ -1668,17 +1706,9 @@ def api_completion_by_id(task_id, completion_id):
         # if 'was_cancelled' not in completion:
         completion['was_cancelled'] = was_cancelled
         batch_id = db.session.query(Task.batch_id).filter(Task.id == task_id).scalar()
-        
-        oldcompletionformattype = Completion.query(Completion.format_type).filter_by(id=completion_id).scalar()
-        if format_type == 4:
-            originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
-            accuracy = evulateCompletion(completion, originalCompletion, batch_id)
-            g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled, format_type, accuracy)
-        else:
-            g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled, format_type, -1.0)
         # g.project.save_completion(task_id, completion)
         # completion['id'] = completion_id
-        
+        g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled)
         return make_response('ok', 201)
 
     # delete completion

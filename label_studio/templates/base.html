@@ -59,7 +59,8 @@ background: #52c41a; background-color: #52c41a; color: white;
 
 <!-- Header -->
 <div id="header">
-  <a id="logo" href="/">
+  {% if user.is_admin == True %}
+    <a id="logo" href="/">
     <img src="../static/images/ls_logo.png" alt="label studio logo" class="img-logo">
     <span class="img-text" id="logo-text">{% if config['description'] and config['description'] != 'default' %}
       {{ config['description'] }}
@@ -67,6 +68,17 @@ background: #52c41a; background-color: #52c41a; color: white;
       {{ config['title'] }}
     {% endif %}</span>
   </a>
+  {% endif %}
+
+  {% if user.is_admin == False %}
+    <img src="../static/images/ls_logo.png" alt="label studio logo" class="img-logo">
+    <span class="img-text" id="logo-text">{% if config['description'] and config['description'] != 'default' %}
+      {{ config['description'] }}
+    {% else %}
+      Labelling 
+    {% endif %}</span>
+  {% endif %}
+  
 {% with messages = get_flashed_messages() %}
   {% if messages %}
     <ul class=flashes>
@@ -105,14 +117,23 @@ background: #52c41a; background-color: #52c41a; color: white;
 {#          </a>#}
 {#        </span>#}
     {% endif %}
-    {% if user.name != None %}
-        {% if batchid  %}
-            <a href="../{{ batchid }}" class="{% if url_for(request.endpoint) == '/' %}active{% endif %}">Labeling</a>
-            <a href="../tasks?batchid={{ batchid }}" class="{% if url_for(request.endpoint) == '/tasks' %}active{% endif %}">Tasks</a>
-        {% endif %}
-        <li>{{ user.name }}</li>
-        <li><a href="../logout">Logout</a></li>
-     {% endif %}
+
+    {% if user.is_admin == True %}
+      {% if batchid  %}
+        <a href="../{{ batchid }}" class="{% if url_for(request.endpoint) == '/' %}active{% endif %}">Labeling</a>
+        <a href="../tasks?batchid={{ batchid }}" class="{% if url_for(request.endpoint) == '/tasks' %}active{% endif %}">Tasks</a>
+      {% endif %}
+      <li>{{ user.name }}</li>
+      <li><a href="../logout">Logout</a></li>
+    {% endif %}
+
+
+    {% if user.is_admin == False %}
+      {% if batchid  %}
+        <a href="../{{ batchid }}" class="{% if url_for(request.endpoint) == '/' %}active{% endif %}">Labeling</a>
+      {% endif %}
+      <li> Worker ID is : {{ user.workerId }}</li>
+    {% endif %}
 
   </ul>
 </div>

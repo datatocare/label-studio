@@ -16,6 +16,7 @@
   window.onload = function () {
     var task = {{ task_data | json | safe }};
     var isAdmin = false;
+
     {% if user.is_admin == True %}
         isAdmin = true;
     {% endif %}

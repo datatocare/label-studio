@@ -1,7 +1,7 @@
 from .base import BaseStorage
 import logging
 import os
-from label_studio.models import Task, Completion, OldCompletion, UserScore, TrainingTask
+from label_studio.models import Task, Completion, OldCompletion, UserScore, TrainingTask, StageRobin
 from label_studio import db
 from label_studio.utils.io import json_load
 from sqlalchemy import func
@@ -42,6 +42,21 @@ def checkAndgetTrainginTask(userID, batchid):
     #     {'userID': userID, 'batchid': batchid}).first()
 
     return nextTask
+
+
+def savestage(id, userID, currentRobinIndex, taskArray):
+    try:
+        if id == -1:
+            dbrobinstage = StageRobin(user_id= userID, current_robin_index=currentRobinIndex, task_array=taskArray)
+            db.session.add(dbrobinstage)
+            db.session.commit()
+        else:
+            update_statement = 'UPDATE stage_robin SET current_robin_index = {0} WHERE id= {1}'.format(currentRobinIndex,id)
+            db.session.execute(update_statement)
+            db.session.commit()
+    except Exception as e:
+        logger.debug("Storage db Error ")
+        logger.debug(e)
 
 
 class JsonDBStorage(BaseStorage):
@@ -145,6 +160,7 @@ class JsonDBStorage(BaseStorage):
     # def nextTask(self, userID, traingTask, batchid):
     def nextTask(self, userID, taskType, batchid):
         # db.session.query()
+        print('next taks is called')
         nextTask = None
         # showDemo = 0
 
@@ -185,10 +201,46 @@ class JsonDBStorage(BaseStorage):
         #         nextTask = db.session.execute(
         #                'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
         #             {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
-        if taskType in (1,2,3, 4):
+        
+        if taskType in (1,2):
+            nexttaskid = None
+            try:
+                robinstage = StageRobin.query.filter_by(user_id=userID).first()
+                if robinstage == None:
+                    randrobin = StageRobin.query.first()
+                    if randrobin == None:
+                        tasklist = db.session.execute(
+                        'SELECT id FROM task WHERE id in (select task_id from completions where completions.user_id = 0 and completions.batch_id = :batchid ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 5', #random()
+                        {'batchid': batchid, 'taskType': 1}).all()
+                        taskArray = '-'.join([str(tid[0]) for tid in tasklist])
+                    else:
+                        taskArray = randrobin.task_array
+                    nexttaskid = taskArray.split('-')[0]
+                    savestage(-1, userID, 1, taskArray)
+                else:
+                    currentRobinIndex = robinstage.current_robin_index
+                    taskArray = robinstage.task_array
+                    id = robinstage.id
+                    nexttaskid = taskArray.split('-')[currentRobinIndex]
+                    currentRobinIndex = currentRobinIndex + 1
+                    currentRobinIndex = currentRobinIndex % 5
+                    savestage(id, userID, currentRobinIndex, taskArray)
+
+                # if taskType == 2:
+                #     nexttaskid = 1228
+                if nexttaskid is not None:
+                    nextTask = db.session.execute(
+                    'SELECT * FROM task WHERE id = :nexttaskid', 
+                    {'nexttaskid': nexttaskid}).first()
+            except Exception as e:
+                print('Problem occured in getting task for first two stages. Here is the exception.')
+                print(e)
+
+        if taskType in (3, 4):
             nextTask = db.session.execute(
                 'SELECT * FROM task WHERE id in (select task_id from completions where completions.user_id = 0 and completions.batch_id = :batchid ) and id not in (select task_id from completions where user_id = :userID  and completions.batch_id = :batchid) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1', #random()
                 {'userID': userID, 'batchid': batchid, 'taskType': 1}).first()
+
             # if nextTask is None:
             #     nextTask = db.session.execute(
             #            'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
@@ -203,7 +255,9 @@ class JsonDBStorage(BaseStorage):
 
         if nextTask is None:
             return None
-        dictTask = dict(nextTask.items())
+
+        dictTask = dict(dict(nextTask).items())
+        print(dictTask)
         completed_at_data = db.session.execute(
             'select id,task_id,data,completed_at from completions where task_id = :id',
             {'id': nextTask.id}).first()

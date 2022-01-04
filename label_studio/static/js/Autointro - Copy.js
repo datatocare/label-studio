@@ -33,25 +33,6 @@ function startIntroRE(_result, _ls) {
     q.start();
 }
 
- 
-// function hasClass(elem, classArr){
-//     this = elem;
-//     var hasClass = 0,
-//         className = this.getAttribute('class');
-  
-//     if( this == null || !classArr || !className ) return false;
-  
-//     if( !(classArr instanceof Array) )
-//       classArr = classArr.split(' ');
-
-//     for( var i in classArr )
-//       // this.classList.contains(classArr[i]) // for modern browsers
-//       if( className.split(classArr[i]).length > 1 )  
-//           hasClass++;
-
-//     return hasClass == classArr.length;
-// }
-
 /////////// Template for Next Step
 function nextStepForTag(result, stepNumber) {
     idtoLabelMap[result[stepNumber].id] = result[stepNumber].value.text;
@@ -60,7 +41,7 @@ function nextStepForTag(result, stepNumber) {
             steps: [{
                 title: 'Tag',
                 element: $("span:contains('" + result[stepNumber].value.labels[0] + "')")[0],
-                intro: 'Select Tag first',
+                intro: 'Select Tag',
                 position: 'top'
             }]
         }).oncomplete(function () {
@@ -70,7 +51,7 @@ function nextStepForTag(result, stepNumber) {
                     steps: [{
                         title: 'Highlight Text!',
                         element: document.querySelector('[class^="Text_block"]'),
-                        intro: 'then, Select Text with mouse!',
+                        intro: 'Select Text with mouse!',
                         position: 'top'
                     }]
                 }).oncomplete(function () {
@@ -94,7 +75,7 @@ function nextStepForTag(result, stepNumber) {
                                 if (didComplete) {
                                     didComplete = false;
                                 } else {
-                                    exitcallNE(ls);
+                                    exitCall(ls);
                                 }
                             }).onafterchange(function (el) {
                                 afterChangeCall(q);
@@ -102,12 +83,12 @@ function nextStepForTag(result, stepNumber) {
                         } else {
                             FinishStep(stepNumber, ls);
                         }
-                    }, (600));
+                    }, (300));
                 }).onexit(function () {
                     if (didComplete) {
                         didComplete = false;
                     } else {
-                        exitcallNE(ls);
+                        //exitCall(ls);
                     }
                 }).onafterchange(function (el) {
                     afterChangeCall(q);
@@ -121,61 +102,23 @@ function nextStepForTag(result, stepNumber) {
                     while(elem != null) {
 
                         if (elem.textContent.indexOf(_text) != -1) {
-
-                            if (elem.className != undefined) {
-                                    if (elem.className.indexOf('htx-highlight') != -1)
-                                    {
-                                        elem = elem.nextSibling;
-                                    }
-                                    else
-                                    {
-                                        if (elem.firstChild != null) {
-     
-                                           elem = elem.firstChild;
-                                        }
-                                        break 
-                                    }
+                            if (elem.firstChild != null) {
+                               elem = elem1.firstChild;
                             }
-                            else{
-                                if (elem.firstChild != null) {
-                                   elem = elem.firstChild;
-                                }
-                            break 
-                            }
-                            
+                            break
                         } else {
                             elem = elem.nextSibling;
                         }
                     }
-
-                    if (elem == null) {
-                            elem = elemenq.firstChild;
-                            while(elem != null) {
-
-                            if (elem.textContent.indexOf(_text) != -1) {
-                                if (elem.firstChild != null) {
-                                   elem = elem.firstChild;
-                                }
-                                break
-                            } else {
-                                elem = elem.nextSibling;
-                            }
-                        }
-                    }
-
-                    if (elem != null)
-                    {
-                        range.setStart(elem, elem.textContent.indexOf(_text));
-                        range.setEnd(elem, elem.textContent.indexOf(_text) + _text.length);
-                        window.getSelection().removeAllRanges();
-                        window.getSelection().addRange(range);
-                        var evt = document.createEvent("MouseEvents");
-                        evt.initEvent("mouseup", true, true);
-                        elemenq.dispatchEvent(evt);
-                    }
-                    
-                }, (1000));
-            }, (600));
+                    range.setStart(elem, elem.textContent.indexOf(_text));
+                    range.setEnd(elem, elem.textContent.indexOf(_text) + _text.length);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                    var evt = document.createEvent("MouseEvents");
+                    evt.initEvent("mouseup", true, true);
+                    elemenq.dispatchEvent(evt);
+                }, (500));
+            }, (300));
         }).onexit(function () {
             if (didComplete) {
                 didComplete = false;
@@ -187,8 +130,8 @@ function nextStepForTag(result, stepNumber) {
         }).start();
         setTimeout(function () {
             $("span:contains('" + result[stepNumber].value.labels[0] + "')")[0].click();
-        }, (1000));
-    }, (600));
+        }, (500));
+    }, (300));
 }
 
 function nextStepForRelation(result, stepNumber) {
@@ -403,7 +346,7 @@ function FinishStep(stepNumber, ls){
         }
      }
     else {
-        exitcallNE(ls);
+        //exitCall(ls);
     }
 }
 
@@ -462,26 +405,10 @@ function resumeCall(){
     $(".introjs-nextbutton").attr("disabled", false);
 }
 
-function exitcallNE(ls)
-{
-    let cs = ls.completionStore;
-    let c = {id: ls.completionStore.completions[1].id, editable: false};
-    if (c.id) cs.selectCompletion(c.id);
-
-    $('.ls-update-btn').hide();
-    if (TaskdataObj.layout_id == 2 && TaskdataObj.batch_id == 5) {
-        $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).children().hide();
-        // $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).find("*").off("click");
-        generateOnlyMouseoverEvent(document.getElementsByClassName("Relations_item__2qMzb")[0]);
-    }
-}
-
-
 function exitCall(ls){
     let cs = ls.completionStore;
     let c = {id: ls.completionStore.completions[1].id, editable: false};
     if (c.id) cs.selectCompletion(c.id);
-
     if (TaskdataObj.layout_id == 2 && TaskdataObj.batch_id == 5) {
         $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).children().hide();
         // $($("span:contains('" + result[0].value.labels[0] + "')")[0].parentElement).find("*").off("click");
@@ -515,20 +442,16 @@ function exitCall(ls){
 function handleButtons(ls){
     let cs = ls.completionStore;
     let c = {id: ls.completionStore.completions[1].id, editable: false};
-    // if (c.id) cs.selectCompletion(c.id);
-    $(".Controls_container__LTeAA").hide();
+
     var Skipbtn = $('.ls-skip-btn').children().first();
-    Skipbtn.html('').append("<span>Show me more</span>");
+    Skipbtn.html('').append("<span>Show me more</span>");;
     $('.ls-update-btn').hide();
     $('.ls-submit-btn').hide();
-
     Skipbtn.on('click', function () {
         c = ls.completionStore.addCompletion({userGenerate: true});
         cs.selectCompletion(c.id);
         // $($(".Controls_container__LTeAA").children).remove();
-        $(".Controls_container__LTeAA").hide();
-        $(".Controls_task__2FuYQ").hide();
-
+        $(".Controls_container__LTeAA").find("*").attr("disabled", true)
     });
 
     btndiv = $(".Controls_container__LTeAA")[0];
@@ -541,10 +464,8 @@ function handleButtons(ls){
       // $(".Controls_container__LTeAA").hide();
         $(".Controls_container__LTeAA").find("*").attr("disabled", true)
     });
-    $(".Controls_container__LTeAA").show();
 
 }
-
 
 function nextStep(result, stepNumber) {
 
@@ -718,7 +639,7 @@ function startIntroNE(_result, _ls) {
         if (didComplete) {
             didComplete = false;
         }else {
-            exitcallNE(ls);
+            //exitCall(ls);
         }
     }).onafterchange(function (el){
         afterChangeCall(q);

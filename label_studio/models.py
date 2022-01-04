@@ -116,7 +116,7 @@ class Completion(db.Model):
         nullable=False,
         unique=False
     )
-
+    format_type = db.Column(db.Integer, default=1)
     # hexID =db.Column(
     #     db.String(2000),
     #     default="",
@@ -129,6 +129,7 @@ class Completion(db.Model):
         # nullable=False,
         # unique=False
     )
+    accuracy = db.Column(db.Float,default=0)
 
 
 class OldCompletion(db.Model):
@@ -240,5 +241,16 @@ class BatchData(db.Model):
         db.String(2000),
         nullable=False,
     )
+    number_of_completions = db.Column(db.Integer,default=0)
+    accuracy = db.Column(db.Float,default=0)
 
 
+class StageRobin(db.Model):
+    __tablename__ = 'stage_robin'
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+    user_id = db.Column(db.Integer)
+    current_robin_index = db.Column(db.Integer,default=0)
+    task_array = db.Column(db.String(500),default="")

@@ -18,6 +18,7 @@ const API_URL = {
 var lastId;
 var tmpLS;
 var isAdmin;
+var workerId;
 var TaskdataObj;
 var urlParam;
 var hitId, turkSubmitTo, assignmentId, gameid;
@@ -139,7 +140,8 @@ const _loadTask = function(ls, url, completionID, reset) {
                 let cs = ls.completionStore;
                 let c;
 
-                if (ls.completionStore.completions.length > 0 && (completionID === 'auto' || isAdmin)) {
+                if (ls.completionStore.completions.length > 0 && (completionID === 'auto')) {
+                //if (ls.completionStore.completions.length > 0 && (completionID === 'auto' || isAdmin)) {
                   c = {id: ls.completionStore.completions[0].id};
                 }
 
@@ -166,21 +168,43 @@ const _loadTask = function(ls, url, completionID, reset) {
                 cs.selected.setupHotKeys();
                 // ls.onTaskLoad(ls, ls.task);
                 setTimeout(function () {
-                    if (isAdmin){
-                        if (response.format_type == 3){
-                            btndiv = $(".Controls_container__LTeAA")[0];
-                            $('.ls-update-btn').hide()
-                            $('.ls-submit-btn').hide();
-                            var submitbutton = $('<button type="button" class="ant-btn ant-btn-primary mysubmitbtn"><span role="img" aria-label="check" class="anticon anticon-check"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 00-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"></path></svg></span><span>Submit </span></button>');
-                            btndiv.append(submitbutton[0]);
-                            submitbutton.on('click', function(){
-                               ls.submitCompletion();
-                            });
-                        }
-                    } else {
-                        MyDOList(ls, ls.task);
-                    }
-                }, (200));
+                      MyDOList(ls, ls.task);
+                      if (response.format_type >= 3 && response.format_type < 6){
+                      btndiv = $(".Controls_container__LTeAA")[0];
+                        $('.ls-update-btn').hide();
+                        $('.ls-submit-btn').hide();
+
+                        var submitbutton = $('<button type="button" class="ant-btn ant-btn-primary mysubmitbtn"><span role="img" aria-label="check" class="anticon anticon-check"><svg viewBox="64 64 896 896" focusable="false" class="" data-icon="check" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 00-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"></path></svg></span><span>Submit </span></button>');
+                        btndiv.append(submitbutton[0]);
+                        submitbutton.on('click', function(){
+                            if (c.serializeCompletion().length == 0){
+                              if (ls.task.dataObj.layout_id == 2){
+                                if (response.format_type == 3)
+                                {
+                                  alert("Response can not be empty! Check the instructions and see answer to add at least one annotation.");
+                                }
+                                else
+                                {
+                                  alert("Response can not be empty! Check the instructions to add at least one annotation.");
+                                }
+                                
+                              }
+                              else{
+                                if (response.format_type == 3)
+                                {
+                                  alert("Response can not be empty! Check the instructions and see answer to add a similar reponse.");
+                                }
+                                else
+                                {
+                                  alert("Response can not be empty! Check the instructions and add some response.");
+                                }
+                              }
+                            }else
+                            {ls.submitCompletion();}
+                          });
+                      }
+                      
+                }, (10));
                 ls.setFlags({ isLoading: false });
               // }
             })
@@ -253,45 +277,57 @@ function MyDOList(ls, task){
     }
 
     if (task && task.dataObj.format_type == 1 ) {
+        $(".Controls_container__LTeAA").hide();
+        $('.ls-update-btn').hide();
+        $('.ls-submit-btn').hide();
+        $('.ls-skip-btn').hide();
+        // alert("here again");
         // $(".Controls_container__LTeAA").empty();
+        var Skipbtn = $('.ls-skip-btn');
+        Skipbtn.html('').append("<span>Show Me more</span>");
+        // $('.ls-skip-btn').hide();
+        Skipbtn.on('click', function () {
+            c = ls.completionStore.addCompletion({userGenerate: true});
+            ls.completionStore.selectCompletion(c.id);
+            $(".Controls_container__LTeAA").hide();
+            $(".Controls_task__2FuYQ").hide();
+            // $(".Controls_container__LTeAA").find("*").attr("disabled", true)
+            // $(".Controls_container__LTeAA").children().each(function(index,element){
+            //     if (index != 0) {
+            //         $(element).hide();
+            //     }
+            // });
+
+            //ls.setFlags({ isLoading: true });
+
+        });
+        btndiv = $(".Controls_container__LTeAA")[0];
+        var btn = $('<button type="button" class="ant-btn ant-btn-primary helpBtn1"><span>Next</span></button>');
+        btndiv.append(btn[0]);
+        $('.helpBtn1').on('click', function () {
+          c = ls.completionStore.addCompletion({userGenerate: true});
+          ls.completionStore.selectCompletion(c.id);
+
+        $(".Controls_container__LTeAA").children().each(function(index,element){
+            if (index != 0) {
+                $(element).hide();
+            }
+        });
+          ls.submitCompletion();
+        });
+         $('.ls-skip-btn').show();
+        ls.completionStore.selected.setEdit(false);
+        $(".Controls_container__LTeAA").show();
         setTimeout(function () {
             if (task.dataObj.completions != null){
-                var Skipbtn = $('.ls-skip-btn');
-                Skipbtn.html('').append("<span>Show Me more</span>");
-                // $('.ls-skip-btn').hide();
-                Skipbtn.on('click', function () {
-                    c = ls.completionStore.addCompletion({userGenerate: true});
-                    ls.completionStore.selectCompletion(c.id);
-                    // $(".Controls_container__LTeAA").hide();
-                    // $(".Controls_container__LTeAA").find("*").attr("disabled", true)
-                    $(".Controls_container__LTeAA").children().each(function(index,element){
-                        if (index != 0) {
-                            $(element).hide();
-                        }
-                    });
-                });
-                btndiv = $(".Controls_container__LTeAA")[0];
-                var btn = $('<button type="button" class="ant-btn ant-btn-primary helpBtn1"><span>Next</span></button>');
-                btndiv.append(btn[0]);
-                $('.helpBtn1').on('click', function () {
-                  c = ls.completionStore.addCompletion({userGenerate: true});
-                  ls.completionStore.selectCompletion(c.id);
-                  // tmpLS = ls;
-                  // tmpLS.onSubmitCompletion();
-                  // $(".Controls_container__LTeAA").hide();
-                  //   $(".Controls_container__LTeAA").find("*").attr("disabled", true)
-                $(".Controls_container__LTeAA").children().each(function(index,element){
-                    if (index != 0) {
-                        $(element).hide();
-                    }
-                });
-                  ls.submitCompletion();
-                });
-                $('.ls-update-btn').hide();
-                $('.ls-submit-btn').hide();
-                ls.completionStore.selected.setEdit(false);
-                showDemo = Cookies.get("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString());
-                if (showDemo == undefined) {
+
+                let cookies_set = document.cookie;
+                cookie_find_str = "exampleshown";
+                if (workerId != "None") {
+                  cookie_find_str = workerId +"exampleshown";
+                }
+                
+                if (!cookies_set.includes(cookie_find_str)) {
                     q = introJs().setOptions({
                         tooltipClass: 'customTooltip',doneLabel: "Let's Start",exitOnOverlayClick: false,exitOnEsc: false,showBullets: false,showStepNumbers: false,overlayOpacity: 0.5,disableInteraction: true,
                         steps: [{
@@ -300,11 +336,22 @@ function MyDOList(ls, task){
                         }]
                     });
                     q.start();
-                    Cookies.set("showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString(), true, { expires: 1 });
-                    // Cookies.remove("example");
+
+                    var date = new Date();
+                    date.setTime(date.getTime()+(1*60*60*1000));// setting cookie for 1 hour;
+                    // alert(date);
+                    var expires = "; expires="+ date.toGMTString();
+                    if (workerId != "None") {
+                      cookie_str = "showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString() +"="+workerId +"exampleshown"+expires+"; path=/";
+                    }
+                    else
+                    {
+                     cookie_str = "showInro" + task.dataObj.format_type.toString() + task.dataObj.layout_id.toString() +"=exampleshown"+expires+"; path=/"; 
+                    }
+                    document.cookie = cookie_str;
                 }
             }
-        }, (250));
+        }, (0));
     } else if (task && task.dataObj.format_type == 2) {
         setTimeout(function () {
             tmpLS = ls;
@@ -320,11 +367,13 @@ function MyDOList(ls, task){
                     // });
                     startIntroRE(task.dataObj.completions[0].result, tmpLS);
                 } else {
+                    //alert("Bilal 4");
                     // $.getScript('static/js/AutointroNE.js');
                     startIntroNE(task.dataObj.completions[0].result, tmpLS);
                 }
             } else if(task.dataObj.layout_id == 5) {
-                // $.getScript('static/js/AutointroRectangle.js');
+                //$.getScript('static/js/AutointroRectangle.js');
+                console.log('startIntroRectangleTask:', task);
                 startIntroRectangle(task.dataObj.completions[0].result, tmpLS);
             } else if(task.dataObj.layout_id == 9 || task.dataObj.layout_id == 12) {
                 // $.getScript('static/js/AutointroImageClassification.js');
@@ -335,27 +384,34 @@ function MyDOList(ls, task){
         //     startIntro(task.dataObj.completions[0].result, tmpLS);
         //     // c = {id: ls.completionStore.completions[1].id, editable: false};
         //     // ls.completionStore.selectCompletion(c.id);
-        }, (1000));
+        }, (0));
     } else if (task && task.dataObj.format_type == 3) {
-        setTimeout(function () {
-            btndiv = $(".Controls_container__LTeAA")[0];
-            if ($(".helpBtn")[0] != undefined) {
-                $(".helpBtn")[0].remove();
-            }
-            var btn = $('<button type="button" class="ant-btn ant-btn-ghost helpBtn" style="background: #52c41a; background-color: #52c41a; color: white"><span>See Answer</span></button>');
-            // btn[0].appendTo(btndiv);
-            btndiv.appendChild(btn[0]);
-            $(".helpBtn").on('click', function(){
-                tmpLS = ls;
-                reRenderTask(tmpLS);
-            });
-        }, (300));
+
+        $('.ls-skip-btn').hide();
+        $('.ls-update-btn').hide();
+        $('.ls-submit-btn').hide();
+        btndiv = $(".Controls_container__LTeAA")[0];
+        if ($(".helpBtn")[0] != undefined) {
+            $(".helpBtn")[0].remove();
+        }
+        var btn = $('<button type="button" class="ant-btn ant-btn-ghost helpBtn" style="background: #52c41a; background-color: #52c41a; color: white"><span>See Answer</span></button>');
+        // btn[0].appendTo(btndiv);
+        btndiv.appendChild(btn[0]);
+        $(".helpBtn").on('click', function(){
+            tmpLS = ls;
+            reRenderTask(tmpLS);
+        });
+
+        // setTimeout(function () {
+
+        // }, (300));
     } else if (task && (task.dataObj.format_type == 6 )) {
         setTimeout(function () {
             btndiv = $(".Controls_container__LTeAA")[0];
             $('.ls-update-btn').hide()// children().first().next().html('').append ("<span>Submit </span>");
             $('.ls-submit-btn').hide();
             ls.completionStore.selected.setEdit(false);
+
            var Skipbtn = $('.ls-skip-btn');
             Skipbtn.on('click', function () {
                 // $(".Controls_container__LTeAA").hide();
@@ -410,8 +466,12 @@ function MyDOList(ls, task){
                 // Cookies.remove("example");
                 q.start();
             }
-        }, (300));
+        }, (10));
     }
+
+    // var matchingElement = document.querySelector("#label-studio > div > div > div > div.App_common__QaThK.ls-common > div.App_menu__X-A5N.ls-menu > div:nth-child(1) > div.ant-card-body > ul > li:nth-child(1)");
+    // // alert(matchingElement);
+    // matchingElement.style.display = "none";
 }
 
 function reRenderTask(ls){
@@ -431,12 +491,16 @@ function reRenderTask(ls){
     cs.selected.setupHotKeys();
         btndiv = $(".Controls_container__LTeAA")[0];
         $(".helpBtn").children().first().html('').append ("<span>Back to Task </span>");
-        parent = $(".ls-skip-btn").parent();
-        parent.children().eq(0).before(parent.children().last());
-        parent.children().eq(0).before(parent.children().last());
+        // parent = $(".ls-skip-btn").parent();
+        // parent.children().eq(0).before(parent.children().last());
+        // parent.children().eq(0).before(parent.children().last());
+        // $('.ls-skip-btn').hide();
+        // $('.ls-update-btn').hide();
         $('.ls-skip-btn').hide();
         $('.ls-update-btn').hide();
         $('.ls-submit-btn').hide();
+
+        $('.mysubmitbtn').hide();
         ls.completionStore.selected.setEdit(false);
     } else {
         c = {id: cs.completions[0].id, editable: false};
@@ -446,16 +510,24 @@ function reRenderTask(ls){
         }
         cs.selected.setupHotKeys();
         $(".helpBtn").children().first().html('').append ("<span>See Answer </span>");
-        parent = $(".helpBtn").parent();
-        var evt = document.createEvent("MouseEvents");
-        evt.initEvent("click", true, false);
-        $("body")[0].dispatchEvent(evt);
+        // parent = $(".helpBtn").parent();
+        // var evt = document.createEvent("MouseEvents");
+        // evt.initEvent("click", true, false);
+        // $("body")[0].dispatchEvent(evt);
 
-        parent.children().eq(0).before(parent.children().last());
-        parent.children().eq(0).before(parent.children().last());
-        $('.ls-skip-btn').show();
-        $('.ls-update-btn').show();
-        $('.ls-submit-btn').show();
+        // parent.children().eq(0).before(parent.children().last());
+        // parent.children().eq(0).before(parent.children().last());
+        // parent.children().eq(0).before(parent.children().last());
+        // parent.children().eq(0).before(parent.children().last());
+
+        // $('.ls-skip-btn').show();
+        // $('.ls-update-btn').show();
+        $('.ls-skip-btn').hide();
+        $('.ls-update-btn').hide();
+        $('.ls-submit-btn').hide();
+        $('.mysubmitbtn').show();
+
+
         ls.completionStore.selected.setEdit(true);
     }
 
@@ -513,6 +585,8 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
   const showHistory = task === null;  // show history buttons only if label stream mode, not for task explorer
   const batch_id = batchid;
   isAdmin = _isAdmin;
+  workerId = _workerId;
+
   if (_workerId != "None") {
       urlParam = "workerId=" + _workerId + "&hitId=" + _hitId + "&turkSubmitTo=" + _turkSubmitTo + "&assignmentId=" + _assignmentId + "&gameid=" + _gameid;
   } else {
@@ -626,6 +700,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
           //   position: 'bottom center'
           // });
           } else if (res && res.IsEmpty) {
+            //alert("Bilal 4");
               $('body').toast({
             class: 'error',
             title: 'Empty Response',
@@ -668,6 +743,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
                      'Next <i class="ui icon fa-angle-right"></i></button>');
         firstBlock.after(block);
       }
+
 
 
     },
@@ -731,6 +807,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
             // loadTask(ls, ls.task.id, res.id);
           // } else {
             if (ls.task.dataObj.format_type == 1) {
+                // alert("here again format type 1");
                 loadNext(ls,true, 1, batch_id);
             } else {
                 loadNext(ls, true, 0, batch_id);
@@ -754,6 +831,10 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
       ls.onTaskLoad = this.onTaskLoad;  // FIXME: make it inside of LSF
       ls.onPrevButton = this.onPrevButton; // FIXME: remove it in future
       initHistory(ls);
+      // var xpath = "//*[@id="label-studio"]/div/div/div/div[2]/div[2]/div[1]/div[2]/ul/li[1]";
+      // var matchingElement = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+      // 
+
       if (reset == false) {
           if (!task) {
               ls.setFlags({isLoading: true});
@@ -823,5 +904,7 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
 
   LS._sdk = sdk;
 
+      // matchingElement.style.display = "none";
+      //#label-studio > div > div > div > div.App_common__QaThK.ls-common > div.App_menu__X-A5N.ls-menu > div:nth-child(1) > div.ant-card-body > ul > li:nth-child(1)
   return LS;
 };

@@ -62,7 +62,7 @@
                      :class="{'fa-sort-up': this.order=='has_cancelled_completions', 'fa-sort-down': this.order=='-has_cancelled_completions'}"></i>
                 </th>
                 <th v-if="columns.includes('actions')">
-                  Actions
+                  View Completion
                 </th>
 
                 <!-- Label config fields -->
@@ -121,21 +121,21 @@
                     <span data-tooltip="Show task data" class="action-button">
                       <i @click.stop="window.open('api/tasks/' + task.id + '/?pretty=1')" class="icon code" style="opacity: 0.75"></i>
                     </span>
-                    <!-- Delete task -->
-                    <span v-if="project.can_delete_tasks" class="action-button">
+                    <!-- Delete task -- diable for now, enable it may be in fututre -->
+<!--                     <span v-if="project.can_delete_tasks" class="action-button">
                       <a class="trash" @click.stop="deleteTask(task)" data-tooltip="Delete task">
                         <i class="fas fa-trash-alt trash remove-task"></i>
                       </a>
-                    </span>
+                    </span> -->
                     <!-- Delete completions -->
-                    <span v-if="project.can_manage_completions" class="action-button">
+<!--                     <span v-if="project.can_manage_completions" class="action-button">
                       <span v-if="task.completions">
                         <a class="trash" @click.stop="deleteCompletion(task, task.completions[0])"
                            data-tooltip="Delete all completions of this task">
                           <i class="far fa-trash-alt trash remove-completion"></i>
                         </a>
                       </span>
-                    </span>
+                    </span> -->
                   </div>
                 </td>
 
@@ -408,7 +408,7 @@
           order: Cookies.get('order', 'id'),
           auto_update_timer: null,
           show_settings: false,
-          timer_interval: 5000,
+          timer_interval: 5000, // set non zero value in seconds for 5 seconds value =
           text_preview_limit: Cookies.get('text_preview_limit', 400),
           error: null,
 
@@ -427,7 +427,7 @@
 
           // provided by api/tasks
           tasks: [],
-
+          users_tasks_count: 1,
           // provided by api/project/storage-settings
           storage_settings: {
             source: {
@@ -457,10 +457,14 @@
           return this.tasks;
         },
         totalPages: function () {
-          var total = Math.ceil(this.project.task_count / parseInt(this.page_size));
+          var self = this;
+          var total = Math.ceil(self.users_tasks_count / parseInt(self.page_size));
+          // alert(self.users_tasks_count);
+          // alert(total);
           if (this.page > total)
             this.page = total;
           return total;
+
         }
       },
 
@@ -520,6 +524,20 @@
             }
 
           );
+
+          this.getApi('users_tasks_count', 'api/users_tasks_count?batchid={% endraw %}{{ batchid }}{% raw %}',
+            // always
+            function (data) {
+              self.users_tasks_count = parseInt(data)
+              // alert(data);
+              // alert(self.users_tasks_count);
+            },
+            // fail
+            function (data) {
+              self.showError('Users Tasks count error', message_from_response(data))
+            }
+          );
+
         },
 
         // get project info from api
@@ -527,7 +545,8 @@
           var self = this;
           this.getApi('project', 'api/project/' + (polling ? '?polling=true': ''),
             // always
-            function () {
+            function (data) {
+              console.log(data);
               self.project_loaded = true;
             },
             // fail
@@ -762,7 +781,11 @@
           //} //else {
             window.LSF_SDK = LSF_SDK("label-studio", layout, task, false, null, false, null,null, 1);
          }
-          // var self = this;
+         else
+          {
+            window.LSF_SDK._sdk.loadTask(task.id, 'auto');
+          }
+          // 
 
           // setTimeout(function () {
           //   if (self.labelStudio) {
@@ -788,8 +811,24 @@
           }
           this.current_task_index = index;
           var task = this.tasks[index];
-          this.current_task && this.current_task.id === task.id && this.quick_view
-            ? this.closeTaskPreview() : this.openTaskPreview(task);
+          if (this.quick_view === true)
+          {
+            if (this.current_task.id === task.id)
+            {
+              this.closeTaskPreview()
+            }
+            else
+            {
+              this.openTaskPreview(task);
+            }
+          }
+          else
+          {
+            this.openTaskPreview(task);
+          }
+
+          // this.current_task && this.current_task.id === task.id && this.quick_view
+          //   ? this.closeTaskPreview() : this.openTaskPreview(task);
         },
 
         nextPage: function () {
@@ -986,7 +1025,8 @@
         // project and tasks auto update timer
         var project_timer_interval = this.project.config.task_page_auto_update_timer ?
           this.project.config.task_page_auto_update_timer.toString(): '10000';
-        this.timer_interval = parseInt(getUrlArg('timer', project_timer_interval));
+        this.timer_interval = 0;
+        //parseInt(getUrlArg('timer', project_timer_interval));
         this.startAutoUpdateTimer();
         if (this.timer_interval > 0) {
           console.log('auto update enabled, use ?timer=0 to disable it on this page')

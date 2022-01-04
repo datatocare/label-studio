@@ -163,8 +163,8 @@ function CreatePath(result, stepNumber){
                     stage.fire("mousemove", {clientX: mx, clientY: my, evt: { offsetX: mx, offsetY: my } });
                 }, (30));
             // };
-        }, (500));
-    }, (600));
+        }, (1000));
+    }, (1000));
 }
 function doNextPoints(result, stepNumber){
     waitCall();

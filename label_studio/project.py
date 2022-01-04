@@ -162,9 +162,10 @@ class Project(object):
     def create_storages(self):
         source = self.config['source']
         target = self.config['target']
-        self.source_storage = create_storage(source['type'], 'source', source['path'], self.path,self.config['load_source'], self,
+        lsrc = False
+        self.source_storage = create_storage(source['type'], 'source', source['path'], self.path,False, self,
                                                  **source.get('params', {}))
-        self.target_storage = create_storage(target['type'], 'target', target['path'], self.path,self.config['load_source'], self,
+        self.target_storage = create_storage(target['type'], 'target', target['path'], self.path,False, self,
                                                  **target.get('params', {}))
 
     def update_storage(self, storage_for, storage_kwargs):
@@ -279,7 +280,7 @@ class Project(object):
             self.add_ml_backend(ml_backend_params, raise_on_error=False)
 
     def load_converter(self):
-        self.converter = Converter(self.parsed_label_config)
+        self.converter = Converter(self.parsed_label_config, self.path)
 
     @property
     def id(self):
@@ -610,7 +611,7 @@ class Project(object):
             data['predictions'] = self.source_storage.get(task_id).get('predictions', [])
         return data
 
-    def save_completion_in_DB(self, task_id, completion, batch_id, was_skipped):
+    def save_completion_in_DB(self, task_id, completion, batch_id, was_skipped, format_type=0, accuracy=0.0):
         """ Save completion
 
         :param task_id: task id
@@ -629,12 +630,18 @@ class Project(object):
                         dbCompletion.data = json.dumps(completion)
                         dbCompletion.completed_at = timestamp_now()
                         dbCompletion.batch_id = batch_id
+
+
                         if was_skipped == "1":
                             dbCompletion.was_skipped = True
                         else:
                             dbCompletion.was_skipped = False
                         # dbCompletion.was_skipped = was_skipped
                         # dbCompletion.lea
+
+                        if accuracy > -1:
+                            dbCompletion.accuracy = accuracy
+
                         db.session.add(dbCompletion)
                         db.session.commit()
                         logger.debug(
@@ -649,7 +656,13 @@ class Project(object):
                     _was_skipped = False
                     if was_skipped == "1":
                         was_skipped = True
-                    dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=json.dumps(completion),completed_at=completion['created_at'], batch_id=batch_id, was_skipped=was_skipped)#,hexID=completion["result"][0]['id']
+
+                    try:  
+                        dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=json.dumps(completion),completed_at=completion['created_at'], batch_id=batch_id, was_skipped=was_skipped, format_type=format_type, accuracy=accuracy)
+                    except:
+                        print('there is problem here.')
+                    # dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=json.dumps(completion),completed_at=completion['created_at'], batch_id=batch_id, was_skipped=was_skipped)#,hexID=completion["result"][0]['id']
+                    
                     db.session.add(dbCompletion)
                     db.session.commit()
                     # _dbCompletion = dbCompletion.__dict__
@@ -986,6 +999,8 @@ class Project(object):
         with io.open(os.path.abspath(config_path)) as c:
             config = json.load(c)
 
+        print(config)
+        
         if not config.get('source'):
             config['source'] = {
                 'name': 'Tasks',
