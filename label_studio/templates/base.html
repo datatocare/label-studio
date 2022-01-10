@@ -52,6 +52,65 @@
 .helpBtn{
 background: #52c41a; background-color: #52c41a; color: white;
 }
+
+
+.exitbtn {
+/*text-align: center;
+    display: inline;
+    float: right;
+    padding: 2%;
+    margin: 2%;
+    color: white;
+    width: 100%;
+    background-color: #ff2828;
+    font-size: 1.6em;
+    font-family: sans-serif;*/
+
+
+/*    hsl(27,90%,70%);
+    --orange-400: hsl(27,90%,55%);*/
+
+/*    color: hsl(0,0%,100%);
+    background-color: hsl(358,62%,52%);
+    box-shadow: inset 0 1px 0 0 hsl(0deg 0% 100% / 40%);
+    position: relative;
+    float: right;
+    display: inline-block;
+    padding: 0.7em;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    /*margin: 2%;*/
+/*    outline: none;
+    font-size: 1.5em;
+    font-weight: normal;
+    font-family: sans-serif;
+    line-height: 1.15384615;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    user-select: none;*/
+
+
+    color: hsl(0,0%,100%);
+    background-color: hsl(358,62%,52%);
+    box-shadow: inset 0 1px 0 0 hsl(0deg 0% 100% / 40%);
+    position: relative;
+    float: right;
+    display: inline-block;
+    padding: 0.7em;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    outline: none;
+    font-size: 1.2em;
+    font-weight: normal;
+    font-family: sans-serif;
+    line-height: 1.15384615;
+    text-align: center;
+    cursor: pointer;
+
+}
+
+
 </style>
 </head>
 
@@ -132,8 +191,26 @@ background: #52c41a; background-color: #52c41a; color: white;
       {% if batchid  %}
         <a href="../{{ batchid }}" class="{% if url_for(request.endpoint) == '/' %}active{% endif %}">Labeling</a>
       {% endif %}
-      <li> Worker ID is : {{ user.workerId }}</li>
+      <!-- <li> Worker ID is : {{ user.workerId }}</li> -->
     {% endif %}
+
+<!--     {% if user %}
+    <div class="exitbutton">
+      <a href="/survey?workerId={{user.workerId}}" title="exit">
+
+      </a>
+      <a class="exitbutton" href="">
+          Exit
+      </a>
+    </div>
+    {% endif %} -->
+
+    {% if user.workerId != None %}
+
+    <button type="button" onClick="exittasks('{{user.workerId}}')" class="exitbtn">
+      Exit labelling </button>
+    {% endif %}
+
 
   </ul>
 </div>
@@ -159,6 +236,26 @@ background: #52c41a; background-color: #52c41a; color: white;
       logo.show();
     }
   })
+
+function exittasks(workerId)
+{   
+  // console.log(user);
+
+    var answer = window.confirm("Are you sure, you want to exit? Once exited, you can never resume work or work on this hit again?");
+    if (answer) {
+
+        window.location.assign("/survey?workerId=" + workerId );
+
+
+
+    }
+    else {
+        //some code
+    }
+    
+    
+}
+
 </script>
 </body>
 </html>

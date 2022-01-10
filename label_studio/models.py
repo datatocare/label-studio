@@ -99,6 +99,7 @@ class Task(db.Model):
     description = db.Column(
         db.String(2000)
     )
+    confidence_score = db.Column(db.Float,default=0)
 
 
 class Completion(db.Model):
@@ -129,7 +130,8 @@ class Completion(db.Model):
         # nullable=False,
         # unique=False
     )
-    accuracy = db.Column(db.Float,default=0)
+    accuracy_rank = db.Column(db.Float,default=0)
+    source_completion_id = db.Column(db.Integer, default=0)
 
 
 class OldCompletion(db.Model):
@@ -241,7 +243,8 @@ class BatchData(db.Model):
         db.String(2000),
         nullable=False,
     )
-    number_of_completions = db.Column(db.Integer,default=0)
+    number_of_completions = db.Column(db.Integer,default=1)
+    number_of_completions_advance = db.Column(db.Integer,default=10)
     accuracy = db.Column(db.Float,default=0)
 
 
@@ -254,3 +257,20 @@ class StageRobin(db.Model):
     user_id = db.Column(db.Integer)
     current_robin_index = db.Column(db.Integer,default=0)
     task_array = db.Column(db.String(500),default="")
+
+
+class WorkerExit(db.Model):
+    __tablename__ = 'worker_exit'
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    workerId = db.Column(db.String(100), nullable=False)
+    survey_data = db.Column(
+        db.String(2000),
+        nullable=False,
+        unique=False
+    )
+    completion_code = db.Column(db.String(100), nullable=False)
+    exit_at = db.Column(db.BigInteger)

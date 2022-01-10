@@ -204,7 +204,7 @@ const _loadTask = function(ls, url, completionID, reset) {
                           });
                       }
                       
-                }, (10));
+                }, (100));
                 ls.setFlags({ isLoading: false });
               // }
             })
@@ -351,7 +351,7 @@ function MyDOList(ls, task){
                     document.cookie = cookie_str;
                 }
             }
-        }, (0));
+        }, (50));
     } else if (task && task.dataObj.format_type == 2) {
         setTimeout(function () {
             tmpLS = ls;
@@ -384,7 +384,7 @@ function MyDOList(ls, task){
         //     startIntro(task.dataObj.completions[0].result, tmpLS);
         //     // c = {id: ls.completionStore.completions[1].id, editable: false};
         //     // ls.completionStore.selectCompletion(c.id);
-        }, (0));
+        }, (50));
     } else if (task && task.dataObj.format_type == 3) {
 
         $('.ls-skip-btn').hide();
@@ -466,7 +466,7 @@ function MyDOList(ls, task){
                 // Cookies.remove("example");
                 q.start();
             }
-        }, (10));
+        }, (100));
     }
 
     // var matchingElement = document.querySelector("#label-studio > div > div > div > div.App_common__QaThK.ls-common > div.App_menu__X-A5N.ls-menu > div:nth-child(1) > div.ant-card-body > ul > li:nth-child(1)");
@@ -592,11 +592,24 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
   } else {
       urlParam = "";
   }
+
+  const _prepDataCid = function(c, Cid) {
+    var completion = {
+      lead_time: (new Date() - c.loadedDate) / 1000,  // task execution time
+      result: c.serializeCompletion()
+    };
+
+    completion.id = parseInt(Cid);
+    const body = JSON.stringify(completion);
+    return body;
+  };
+
   const _prepData = function(c, includeId) {
     var completion = {
       lead_time: (new Date() - c.loadedDate) / 1000,  // task execution time
       result: c.serializeCompletion()
     };
+
     if (includeId) {
         completion.id = parseInt(c.id);
     }
@@ -670,6 +683,16 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
                         $(element).hide();
                     }
                 });
+
+        
+
+        console.log(ls.task.dataObj.format_type);
+        console.log(ls.task.dataObj.completions[0].id);
+        // console.log(ls.task);
+        // console.log(ls.task["completions"][0]);
+        // console.log(ls.task["completions"][0]['id']);
+
+
         // if (c.serializeCompletion().length == 0 &&  TaskdataObj.format_type == 3){
         //     $('body').toast({
         //     class: 'error',
@@ -685,8 +708,22 @@ const LSF_SDK = function(elid, config, task, hide_skip, description, reset, resp
         //     return false ;
         // }
 
-      const req = Requests.poster(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/?${urlParam}`, _prepData(c) );
+      let body = '';
 
+
+      if (ls.task.dataObj.format_type == 6)
+      {
+        body = _prepDataCid(c, ls.task.dataObj.completions[0].id);
+
+      }
+      else
+      {
+        body = _prepData(c);
+
+      }
+
+      const req = Requests.poster(`${API_URL.MAIN}${API_URL.TASKS}/${ls.task.id}${API_URL.COMPLETIONS}/?${urlParam}`, body );
+      
       req.then(function(httpres) {
         httpres.json().then(function(res) {
           if (res && res.id) {

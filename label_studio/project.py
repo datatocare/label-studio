@@ -611,15 +611,16 @@ class Project(object):
             data['predictions'] = self.source_storage.get(task_id).get('predictions', [])
         return data
 
-    def save_completion_in_DB(self, task_id, completion, batch_id, was_skipped, format_type=0, accuracy=0.0):
+    def save_completion_in_DB(self, task_id, completion, batch_id, was_skipped, format_type=0, accuracy_rank=0.0):
         """ Save completion
 
         :param task_id: task id
         :param completion: json data from label (editor)
         """
         # try to get completions with task first
+        print('there is problem here.')
         task = self.source_storage.get(task_id)
-
+        print('there is problem here.')
         if task is not None:
             # task = task.__dict__
             # logger.debug(type(completion['id']))
@@ -639,8 +640,8 @@ class Project(object):
                         # dbCompletion.was_skipped = was_skipped
                         # dbCompletion.lea
 
-                        if accuracy > -1:
-                            dbCompletion.accuracy = accuracy
+                        if accuracy_rank > -1:
+                            dbCompletion.accuracy_rank = accuracy_rank
 
                         db.session.add(dbCompletion)
                         db.session.commit()
@@ -648,6 +649,7 @@ class Project(object):
                             'Completion ' + str(task_id) + ' updated:\n' + json.dumps(str(dbCompletion), indent=2))
                         return dbCompletion.id
                 else:
+                    print('there is problem here creation.')
                     completion['created_at'] = timestamp_now()
                     # _user_id = completion["user"]
                     # _taks_id = task.id
@@ -658,7 +660,8 @@ class Project(object):
                         was_skipped = True
 
                     try:  
-                        dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=json.dumps(completion),completed_at=completion['created_at'], batch_id=batch_id, was_skipped=was_skipped, format_type=format_type, accuracy=accuracy)
+                        dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=json.dumps(completion),completed_at=completion['created_at'], batch_id=batch_id, was_skipped=was_skipped, format_type=format_type, accuracy_rank=accuracy_rank)
+                        print('there is problem here.')
                     except:
                         print('there is problem here.')
                     # dbCompletion = Completion(user_id=completion["user"] , task_id=task.id,data=json.dumps(completion),completed_at=completion['created_at'], batch_id=batch_id, was_skipped=was_skipped)#,hexID=completion["result"][0]['id']

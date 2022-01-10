@@ -162,47 +162,8 @@ class JsonDBStorage(BaseStorage):
         # db.session.query()
         print('next taks is called')
         nextTask = None
-        # showDemo = 0
 
-        # userDemoFlag = UserScore.query.filter_by(user_id=userID, batch_id=batchid).first()
-        # if userDemoFlag == None or userDemoFlag.showDemo == True or traingTask == '1':
-        #     nextTask = checkAndgetTrainginTask(userID, batchid)
-            # nextTask = db.session.execute(
-            #     'SELECT * FROM TrainingTask WHERE id not in (select task_id from completions where user_id = :userID ) order by id',
-            #       {'userID': userID}).first()
-            # showDemo = 1
-        # else:
-            # print("Here 5")
-            # print("Here 1")
-            # print(userScore)
-            # if userScore < 20:
-            #     nextTask = checkAndgetTrainginTask(userID)
-            # else:
-            # nextTask = db.session.execute(
-            #     'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid  order by id',
-            #     {'userID': userID, 'batchid': batchid}).first()
-            # nextTask = db.session.execute(
-            #     'SELECT * FROM task WHERE  id not in (select task_id from completions where user_id = :userID ) ' +
-            #     'and batch_id = :batchid  order by id',
-            #     {'userID': userID, 'batchid': batchid}).first()
-
-        # logger.debug(nextTask)
-        # logger.debug(type(nextTask))
-        # for r in nextTask:
-            # print(r[0])  # Access by positional index
-            # print(r['my_column'])  # Access by column name as a string
-            # r_dict = dict(r.items())  # convert to dict keyed by column names
-            #  return r.__dict_
-        # if taskType in (1, 2):
-        #     nextTask = db.session.execute(
-        #         'SELECT * FROM task WHERE id in (select task_id from completions where user_id != :userID ) and id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
-        #         {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first() #and id not in (select task_id from completions where user_id = :userID )
-        #     if nextTask is None:
-        #         nextTask = db.session.execute(
-        #                'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
-        #             {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
-        
-        if taskType in (1,2):
+        if taskType in (1,2,3):
             nexttaskid = None
             try:
                 robinstage = StageRobin.query.filter_by(user_id=userID).first()
@@ -226,30 +187,41 @@ class JsonDBStorage(BaseStorage):
                     currentRobinIndex = currentRobinIndex % 5
                     savestage(id, userID, currentRobinIndex, taskArray)
 
-                # if taskType == 2:
-                #     nexttaskid = 1228
                 if nexttaskid is not None:
                     nextTask = db.session.execute(
                     'SELECT * FROM task WHERE id = :nexttaskid', 
                     {'nexttaskid': nexttaskid}).first()
+
             except Exception as e:
                 print('Problem occured in getting task for first two stages. Here is the exception.')
                 print(e)
 
-        if taskType in (3, 4):
+
+        if taskType == 4:
             nextTask = db.session.execute(
                 'SELECT * FROM task WHERE id in (select task_id from completions where completions.user_id = 0 and completions.batch_id = :batchid ) and id not in (select task_id from completions where user_id = :userID  and completions.batch_id = :batchid) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1', #random()
                 {'userID': userID, 'batchid': batchid, 'taskType': 1}).first()
 
-            # if nextTask is None:
-            #     nextTask = db.session.execute(
-            #            'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID ) and batch_id = :batchid and format_type = :taskType order by RANDOM() LIMIT 1',
-            #         {'userID': userID, 'batchid': batchid, 'taskType': taskType}).first()
-        elif taskType in (5, 6):
-            nextTask = db.session.execute(
-                # 'SELECT * FROM task WHERE id NOT in (select task_id from completions where completions.user_id = 0 and completions.batch_id = :batchid ) and id not in (select task_id from completions where user_id = :userID and completions.batch_id = :batchid ) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1',
-                'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID and completions.batch_id = :batchid ) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1',
-                {'userID': userID, 'batchid': batchid, 'taskType': 1}).first()
+        elif taskType == 5:
+            #check first tasks which are not ever done by any users or admin
+            query = 'SELECT * FROM task WHERE id not in (select task_id from completions where completions.batch_id = {0} ) and batch_id = {0} and format_type = {1} order by id LIMIT 1'.format(batchid,1)
+            nextTask = db.session.execute(query).first()
+            print(query)
+            if nextTask is None:
+                # check task which is not done by admin but only other users
+                query = 'SELECT * FROM task WHERE id not in (select task_id from completions where completions.user_id = 0 and completions.batch_id = {0} ) and id not in (select task_id from completions where user_id = {1}  and completions.batch_id = {0}) and batch_id = {0} and format_type = {2} order by id LIMIT 1'.format(batchid,userID,1)
+                nextTask = db.session.execute(query).first()
+                print(query)
+                if nextTask is None:
+                    # check task which with admin completions
+                    query = 'SELECT * FROM task WHERE id in (select task_id from completions where completions.user_id = 0 and completions.batch_id = {0} ) and id not in (select task_id from completions where user_id = {1}  and completions.batch_id = {0}) and batch_id = {0} and format_type = {2} order by id LIMIT 1'.format(batchid,userID,1)
+                    nextTask = db.session.execute(query).first()
+                    print(query)
+
+        elif taskType == 6:
+            query = 'SELECT * FROM task WHERE id not in (select task_id from completions where user_id = {0} and completions.batch_id = {1} ) and id in (select task_id from completions where completions.batch_id = {1} and completions.format_type = 5 and completions.accuracy_rank <= 80) and batch_id = {1} and format_type = 1 order by confidence_score ASC LIMIT 1'.format(userID,batchid)
+            nextTask = db.session.execute(query).first()
+            print(query)
 
         # TODO : Check if completion is empty the re elect task
 
@@ -257,25 +229,23 @@ class JsonDBStorage(BaseStorage):
             return None
 
         dictTask = dict(dict(nextTask).items())
-        print(dictTask)
-        completed_at_data = db.session.execute(
-            'select id,task_id,data,completed_at from completions where task_id = :id',
-            {'id': nextTask.id}).first()
 
-        if completed_at_data is not None:
-            completionData = json.loads(completed_at_data.data)
-            completionData['id'] = completed_at_data.id
+        if taskType == 6:
+            completion_data = db.session.execute(
+                'select id,task_id,data,completed_at from completions where task_id = :id and format_type = 5 order by accuracy_rank ASC',
+                {'id': nextTask.id}).first()
+        else:
+            completion_data = db.session.execute(
+                'select id,task_id,data,completed_at from completions where task_id = :id',
+                {'id': nextTask.id}).first()            
+
+        if completion_data is not None:
+            completionData = json.loads(completion_data.data)
+            completionData['id'] = completion_data.id
             # logger.debug(json.dumps(completionData, indent=2))
             dictTask["completions"] = [completionData]  # [json.loads(completion.data)]
-            dictTask['completed_at'] = completed_at_data.completed_at
+            dictTask['completed_at'] = completion_data.completed_at
 
-        # if 'result' in dictTask:
-        #     completionData = json.loads(dictTask['result'])
-        #     completionData['id'] = completionData['id']
-        #     # logger.debug(json.dumps(completionData, indent=2))
-        #     dictTask["completions"] = [completionData]  # [json.loads(completion.data)]
-        #     # dictTask['completed_at'] = completionData['completed_at']
-        # dictTask["showDemo"] = showDemo
         return dictTask
 
     def remove(self, key):

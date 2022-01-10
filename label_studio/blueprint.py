@@ -47,7 +47,7 @@ from label_studio.utils.functions import (
 )
 from label_studio.utils.misc import (
     exception_handler, exception_handler_page, check_port_in_use, start_browser, str2datetime,
-    config_line_stripped, get_config_templates, convert_string_to_hash, serialize_class
+    config_line_stripped, get_config_templates, convert_string_to_hash, serialize_class, timestamp_now
 )
 from label_studio.utils.analytics import Analytics
 from label_studio.utils.argparser import parse_input_args
@@ -57,7 +57,7 @@ from label_studio.storage import get_storage_form
 from label_studio.project import Project
 from label_studio.tasks import Tasks
 from label_studio.utils.data_manager import prepare_tasks, count_total_users_tasks
-from label_studio.models import User, Completion, Layout, UserScore, Task, BatchData
+from label_studio.models import User, Completion, Layout, UserScore, Task, BatchData, WorkerExit
 from label_studio import db
 import shapely.geometry as geoShape
 
@@ -301,8 +301,6 @@ def labeling_page(batchid = '0'):
 
             # check if User is logged in using login screen
             user = flask_login.current_user
-            print('printing user')
-            print(user)
             if user.is_anonymous or not user.is_authenticated:
                 print(' returning here anon')
                 return redirect(flask.url_for('label_studio.invalid_page'))
@@ -328,6 +326,8 @@ def labeling_page(batchid = '0'):
                 # db.session.close()
             else:
                 user = existing_user
+
+            flask_login.login_user(user)
 
         user_id = user.get_id()
         # get user score ( current task type (1-6)) or user score for batch
@@ -1216,11 +1216,17 @@ def api_generate_next_task(batchid):
         # logger.debug(json.dumps(json.loads(completion.data), indent=2))
         # task["completions"] = [completionData]  # [json.loads(completion.data)]
 
+
+    print('calculating skipps and completions')
     ar = {}
     numOfCompletions = Completion.query.join(Task, Task.id == Completion.task_id).filter(
         Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == False, Completion.format_type > 2).count()
     numOfskips = Completion.query.join(Task, Task.id == Completion.task_id).filter(
         Completion.batch_id == batch_id, Completion.user_id == userId, Completion.was_skipped == True, Completion.format_type > 2).count()
+
+    print(numOfCompletions)
+    print(numOfskips)
+
 
     ar = {}
     ar["money"] = "56"
@@ -1444,6 +1450,8 @@ def api_task_by_id(task_id):
 def api_tasks_completions(task_id):
     """ Save new completion or delete all completions
     """
+
+    print('hereerererere')
     task_id = int(task_id)
     # user = flask_login.current_user.get_id()
     workerId = request.args.get('workerId', None)
@@ -1480,10 +1488,12 @@ def api_tasks_completions(task_id):
     batch_id = db.session.query(Task.batch_id).filter(Task.id==task_id).scalar()
     if request.method == 'POST':
         completion = request.json
-        # print(completion)
+        print('completion received here')
+        print(completion)
         # cancelled completion
         userScore = UserScore.query.filter_by(user_id=userId, batch_id=batch_id).first()
         was_cancelled = request.values.get('was_cancelled', False)
+        print('hereerererere')
         # print(was_cancelled)
         if was_cancelled:
             completion['was_cancelled'] = True
@@ -1512,10 +1522,20 @@ def api_tasks_completions(task_id):
             # userScore = UserScore.query.filter_by(user_id=user, batch_id=batch_id).first()
         print('return before adding completion')
         completion["user"] = userId
-
-        accuracy = 0.0
+        print('hereerererere')
+        completion_accuracy_rank = 0.0
         completed_task_type = 1
         # checkscore(completion)
+
+        if was_cancelled:
+            if userScore is not None:
+                print('hereerererere')
+                if userScore.current_task_type == 6:
+                    userScore = switch_between_stage_5_6(userScore, userId, batch_id)
+                    db.session.add(userScore)
+                    db.session.commit()
+
+
 
         if not was_cancelled:
             if userScore is not None:
@@ -1527,61 +1547,104 @@ def api_tasks_completions(task_id):
                 elif userScore.current_task_type == 3:
                     userScore.current_task_type = 4
                 elif userScore.current_task_type == 4:
+                    print('hereerererere')
                     current_completion_accuracy = evulateCompletion(completion, originalCompletion, batch_id)
                     user_completions_accuracy = db.session.execute(
-                        'SELECT accuracy FROM completions WHERE user_id = :userid and batch_id = :batchid and format_type = 4 and was_skipped = False',
+                        'SELECT accuracy_rank FROM completions WHERE user_id = :userid and batch_id = :batchid and format_type = 4 and was_skipped = False',
                         {'batchid': batch_id, 'userid': userId}).all()
+                    print('hereerererere')
+                    completion_accuracy_rank = current_completion_accuracy
                     print(user_completions_accuracy)
                     if user_completions_accuracy is not None:
                         print('here accuracy')
                         accuracies = [float(uca[0]) for uca in user_completions_accuracy]
                         num_completions = len(accuracies) + 1
-                        accuracy = 100
+                        accuracy_rank = 100
                         # (sum(accuracies) + current_completion_accuracy)/(num_completions)
 
                         req_comps = db.session.query(BatchData.number_of_completions).filter(BatchData.id == batch_id).scalar()
                         req_accuracy = db.session.query(BatchData.accuracy).filter(BatchData.id == batch_id).scalar()
 
                         if num_completions >= req_comps:
-                            if accuracy >= req_accuracy:
+                            if accuracy_rank >= req_accuracy:
                                 print('progressing to stage 5')
                                 userScore.current_task_type = 5
                     else:
                         print('completion is none so far')
 
                 elif userScore.current_task_type == 5:
+                    # current_completion_rank = evaluateCompletionRank(completion, batch_id)
+                    # task_completions_ranks = db.session.execute(
+                    #     'SELECT accuracy_rank FROM completions WHERE task_id = :task_id and format_type = 5 and was_skipped = False',
+                    #     {'task_id': task_id}).all()
+                    # completion_accuracy_rank = current_completion_rank
+                    # if task_completions_ranks is not None:
+                    #     print('here accuracy')
+                    #     ranks = [float(tcr[0]) for tcr in task_completions_ranks]
+                    #     num_completions = len(ranks) + 1
+                    #     confidence_score = 50
+                    #     # (sum(ranks) + current_completion_rank)/(num_completions)
+
+                    #     dbTask = Task.query.filter_by(id=task_id).first()
+                    #     if dbTask is not None:
+                    #         dbTask.confidence_score = confidence_score
+                    #         db.session.add(dbTask)
+                    #         db.session.commit()
+
+
+                        
+                    # userScore = switch_between_stage_5_6(userScore, userId, batch_id)
+                    print('hereerererere')
                     userScore.current_task_type = 6
-                    rardNum = random.uniform(0, 1)
-                    if rardNum >= 0.2:
-                        userScore.current_task_type = 5
-                    else:
-                        userScore.current_task_type = 6
                 elif userScore.current_task_type == 6:
-                    rardNum = random.uniform(0, 1)
-                    if rardNum >=0.2:
-                        userScore.current_task_type = 5
-                    else:
-                        userScore.current_task_type = 6
+                    print('hereerererere')
+                    userScore.current_task_type = 5
+                    # userScore = switch_between_stage_5_6(userScore, userId, batch_id)
+
             else:
                 userScore = UserScore(user_id=userId, batch_id=batch_id, score=0, showDemo=False, current_task_type=1)
 
             db.session.add(userScore)
+            print('new user only when require')
             db.session.commit()
 
         print('about to save completion')
-        completion_id = g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled, completed_task_type, accuracy)
+        print((task_id, completion, batch_id, was_cancelled, completed_task_type, completion_accuracy_rank))
+        completion_id = g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled, completed_task_type, completion_accuracy_rank)
         logger.debug("Received completion" + json.dumps(completion, indent=2))
         logger.debug(completion_id)
-        # completion_id = g.project.save_completion(task_id, completion)
         return make_response(json.dumps({'id': completion_id}), 201)
 
     # remove all task completions
     if request.method == 'DELETE':
         if g.project.config.get('allow_delete_completions', False):
-            g.project.delete_task_completions(task_id)
+            # g.project.delete_task_completions(task_id)
+            #disable deleting functionality to be on save side
             return make_response('deleted', 204)
         else:
             return make_response({'detail': 'Completion removing is not allowed in server config'}, 422)
+
+
+
+
+def evaluateCompletionRank(completion, batch_id):
+    return 50
+
+def switch_between_stage_5_6(userScore, userId, batch_id):
+    randNum = random.uniform(0, 1)
+    if randNum >= 0.8:
+        userScore.current_task_type = 4
+    elif randNum >= 0.2:
+        userScore.current_task_type = 5
+    else:
+        req_comps_adv = db.session.query(BatchData.number_of_completions_advance).filter(BatchData.id == batch_id).scalar()
+        user_completions_stage_5 = Completion.query.filter_by(batch_id == batch_id, user_id == userId, was_skipped == False, format_type == 5).count()
+        if user_completions_stage_5 >= req_comps_adv:
+            task_available = db.session.execute('SELECT * FROM task WHERE id not in (select task_id from completions where user_id = :userID and completions.batch_id = :batchid ) and id in (select task_id from completions where completions.batch_id = :batchid and completions.format_type = 5 and completions.accuracy_rank <= 80) and batch_id = :batchid and format_type = :taskType order by id LIMIT 1',
+            {'userID': userID, 'batchid': batch_id, 'taskType': 1}).count()
+            if task_available > 0:
+                userScore.current_task_type = 6
+    return userScore
 
 
 def evulateCompletion(completion, originalCompletion, batch_id):
@@ -1669,13 +1732,15 @@ def api_completion_by_id(task_id, completion_id):
         completion['was_cancelled'] = was_cancelled
         batch_id = db.session.query(Task.batch_id).filter(Task.id == task_id).scalar()
         
+        print('patching the completion')
         oldcompletionformattype = Completion.query(Completion.format_type).filter_by(id=completion_id).scalar()
         if format_type == 4:
             originalCompletion = Completion.query.filter_by(user_id=0, task_id=task_id).first()
             accuracy = evulateCompletion(completion, originalCompletion, batch_id)
             g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled, format_type, accuracy)
         else:
-            g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled, format_type, -1.0)
+            print('just checking')
+            # g.project.save_completion_in_DB(task_id, completion, batch_id, was_cancelled, format_type, -1.0)
         # g.project.save_completion(task_id, completion)
         # completion['id'] = completion_id
         
@@ -1844,6 +1909,73 @@ def create_app(label_studio_config=None):
 @blueprint.before_app_first_request
 def create_tables():
     db.create_all()
+
+@blueprint.route('/exit', methods=['GET'])
+@flask_login.login_required
+@exception_handler_page
+def exitscreen():
+
+    user = flask_login.current_user
+
+    existing_worker_exit = WorkerExit.query.filter_by(workerId=user.workerId).first()
+    
+    if existing_worker_exit is None:
+        return redirect(flask.url_for('label_studio.invalid_page'))
+    
+    else:
+        return flask.render_template(
+            'exit.html',
+            code=existing_worker_exit.completion_code
+        )
+
+
+@blueprint.route('/survey', methods=['GET', 'POST'])
+@flask_login.login_required
+@exception_handler_page
+def survey():
+
+
+
+
+    if flask.request.method == 'GET':
+        user = flask_login.current_user
+        workerId = user.workerId
+        if workerId is None:
+            return redirect(flask.url_for('label_studio.invalid_page'))
+        else:
+            existing_worker_exit = WorkerExit.query.filter_by(workerId=workerId).first()
+            if existing_worker_exit is None:
+                return flask.render_template('survey.html')
+            else:
+                return redirect(flask.url_for('label_studio.exitscreen'))
+    else:
+
+        user = flask_login.current_user
+        workerId = user.workerId
+
+        if workerId is None:
+            return redirect(flask.url_for('label_studio.invalid_page'))
+        else:
+            existing_worker_exit = WorkerExit.query.filter_by(workerId=workerId).first()
+            if existing_worker_exit is None:
+                user_id = user.id
+                survey_data = request.form.to_dict(flat=False)
+                exit_at = timestamp_now()
+                completion_code = str(uuid4())
+
+                try:  
+                    dbWorkerExit = WorkerExit(user_id=user_id,workerId=workerId,survey_data=json.dumps(survey_data),completion_code=completion_code, exit_at=exit_at)
+
+                except:
+                    print('there is problem in exit worker with end code.')
+
+                logger.debug('Exit of ' + str(workerId) + ' saved:\n' + json.dumps(str(dbWorkerExit), indent=2))
+
+                db.session.add(dbWorkerExit)
+                db.session.commit()
+
+        return redirect(flask.url_for('label_studio.exitscreen'))
+
 
 @blueprint.route('/signup', methods=['GET', 'POST'])
 def signup():
